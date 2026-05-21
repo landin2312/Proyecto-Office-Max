@@ -1,0 +1,60 @@
+﻿seccion,metric,valor,porcentaje,detalle
+resumen,porcentaje_sku_con_beta_mensual_valida,56,27.722772277227726,56 de 202 SKU
+resumen_por_ventana,mensual,223,12.00861604738826,223 validas de 1857 ventanas
+resumen_por_ventana,semestral,951,45.48063127690101,951 validas de 2091 ventanas
+resumen_por_ventana,trimestral,660,29.636281993713514,660 validas de 2227 ventanas
+distribucion_n_observaciones,0-2,2710,43.88663967611336,
+distribucion_n_observaciones,11-20,669,10.834008097165992,
+distribucion_n_observaciones,21+,330,5.344129554655871,
+distribucion_n_observaciones,3-5,1495,24.210526315789473,
+distribucion_n_observaciones,6-10,971,15.724696356275302,
+distribucion_r2,0.00-0.20,1264,20.469635627530362,
+distribucion_r2,0.20-0.40,240,3.8866396761133606,
+distribucion_r2,0.40-0.60,122,1.9757085020242915,
+distribucion_r2,0.60-0.80,78,1.263157894736842,
+distribucion_r2,0.80-1.00,234,3.7894736842105265,
+distribucion_r2,sin R2,4237,68.61538461538461,
+razones_exclusion,n<3,2710,62.42801197880673,
+razones_exclusion,precio constante,871,20.064501266989172,
+razones_exclusion,datos insuficientes,615,14.167242570836214,
+razones_exclusion,qty constante,145,3.3402441833678873,
+top_20_mas_betas_validas,50084493,68,88.31168831168831,68 validas de 77 ventanas
+top_20_mas_betas_validas,50106204,64,83.11688311688312,64 validas de 77 ventanas
+top_20_mas_betas_validas,50077229,62,80.51948051948052,62 validas de 77 ventanas
+top_20_mas_betas_validas,50046029,61,79.22077922077922,61 validas de 77 ventanas
+top_20_mas_betas_validas,50056239,52,70.27027027027027,52 validas de 74 ventanas
+top_20_mas_betas_validas,50033183,49,73.13432835820896,49 validas de 67 ventanas
+top_20_mas_betas_validas,50062268,49,63.63636363636363,49 validas de 77 ventanas
+top_20_mas_betas_validas,50096451,47,61.8421052631579,47 validas de 76 ventanas
+top_20_mas_betas_validas,50065845,45,60.0,45 validas de 75 ventanas
+top_20_mas_betas_validas,50062267,44,66.66666666666666,44 validas de 66 ventanas
+top_20_mas_betas_validas,50073101,43,58.108108108108105,43 validas de 74 ventanas
+top_20_mas_betas_validas,50062025,42,57.534246575342465,42 validas de 73 ventanas
+top_20_mas_betas_validas,50066990,42,56.00000000000001,42 validas de 75 ventanas
+top_20_mas_betas_validas,50046028,42,54.54545454545454,42 validas de 77 ventanas
+top_20_mas_betas_validas,50028915,41,56.94444444444444,41 validas de 72 ventanas
+top_20_mas_betas_validas,50086321,41,54.666666666666664,41 validas de 75 ventanas
+top_20_mas_betas_validas,50062269,40,52.63157894736842,40 validas de 76 ventanas
+top_20_mas_betas_validas,50050823,39,52.702702702702695,39 validas de 74 ventanas
+top_20_mas_betas_validas,50063368,39,51.31578947368421,39 validas de 76 ventanas
+top_20_mas_betas_validas,50046030,37,48.05194805194805,37 validas de 77 ventanas
+top_20_menos_betas_validas,50014835,0,0.0,0 validas de 49 ventanas
+top_20_menos_betas_validas,50016621,0,0.0,0 validas de 4 ventanas
+top_20_menos_betas_validas,50027543,0,0.0,0 validas de 37 ventanas
+top_20_menos_betas_validas,50031716,0,0.0,0 validas de 1 ventanas
+top_20_menos_betas_validas,50031721,0,0.0,0 validas de 6 ventanas
+top_20_menos_betas_validas,50032243,0,0.0,0 validas de 32 ventanas
+top_20_menos_betas_validas,50032245,0,0.0,0 validas de 14 ventanas
+top_20_menos_betas_validas,50032248,0,0.0,0 validas de 6 ventanas
+top_20_menos_betas_validas,50032249,0,0.0,0 validas de 1 ventanas
+top_20_menos_betas_validas,50032685,0,0.0,0 validas de 16 ventanas
+top_20_menos_betas_validas,50034546,0,0.0,0 validas de 1 ventanas
+top_20_menos_betas_validas,50034549,0,0.0,0 validas de 1 ventanas
+top_20_menos_betas_validas,50034550,0,0.0,0 validas de 13 ventanas
+top_20_menos_betas_validas,50034554,0,0.0,0 validas de 6 ventanas
+top_20_menos_betas_validas,50039499,0,0.0,0 validas de 13 ventanas
+top_20_menos_betas_validas,50042265,0,0.0,0 validas de 1 ventanas
+top_20_menos_betas_validas,50042266,0,0.0,0 validas de 21 ventanas
+top_20_menos_betas_validas,50042267,0,0.0,0 validas de 6 ventanas
+top_20_menos_betas_validas,50044442,0,0.0,0 validas de 1 ventanas
+top_20_menos_betas_validas,50044443,0,0.0,0 validas de 1 ventanas

@@ -1,0 +1,48 @@
+﻿seccion,metric,valor,porcentaje,detalle
+resumen,sku_con_beta_mensual_valida,52,21.84873949579832,52 de 238 SKU
+resumen_por_ventana,mensual,178,4.699049630411826,178 validas de 3788 ventanas
+resumen_por_ventana,semestral,1016,37.066763954761036,1016 validas de 2741 ventanas
+resumen_por_ventana,trimestral,598,17.914919113241464,598 validas de 3338 ventanas
+razones_exclusion,n<3,5695,70.52631578947368,
+razones_exclusion,precio constante,1725,21.36222910216718,
+razones_exclusion,qty constante,655,8.111455108359134,
+top_20_mas_betas_validas,50066390,63,81.81818181818183,63 validas de 77 ventanas
+top_20_mas_betas_validas,50099648,63,81.81818181818183,63 validas de 77 ventanas
+top_20_mas_betas_validas,50061735,60,77.92207792207793,60 validas de 77 ventanas
+top_20_mas_betas_validas,50066389,60,77.92207792207793,60 validas de 77 ventanas
+top_20_mas_betas_validas,50099645,51,66.23376623376623,51 validas de 77 ventanas
+top_20_mas_betas_validas,50099646,50,64.93506493506493,50 validas de 77 ventanas
+top_20_mas_betas_validas,50076882,46,59.74025974025974,46 validas de 77 ventanas
+top_20_mas_betas_validas,50099647,44,57.14285714285714,44 validas de 77 ventanas
+top_20_mas_betas_validas,50031938,42,54.54545454545454,42 validas de 77 ventanas
+top_20_mas_betas_validas,50062187,41,53.246753246753244,41 validas de 77 ventanas
+top_20_mas_betas_validas,50086329,40,56.33802816901409,40 validas de 71 ventanas
+top_20_mas_betas_validas,50062188,40,51.94805194805194,40 validas de 77 ventanas
+top_20_mas_betas_validas,50068613,39,54.929577464788736,39 validas de 71 ventanas
+top_20_mas_betas_validas,50062034,39,50.649350649350644,39 validas de 77 ventanas
+top_20_mas_betas_validas,50066388,37,50.0,37 validas de 74 ventanas
+top_20_mas_betas_validas,50068605,37,48.05194805194805,37 validas de 77 ventanas
+top_20_mas_betas_validas,50061989,36,46.75324675324675,36 validas de 77 ventanas
+top_20_mas_betas_validas,50066347,33,46.478873239436616,33 validas de 71 ventanas
+top_20_mas_betas_validas,50068611,33,42.857142857142854,33 validas de 77 ventanas
+top_20_mas_betas_validas,50068612,31,40.25974025974026,31 validas de 77 ventanas
+top_20_menos_betas_validas,50011883,0,0.0,0 validas de 1 ventanas
+top_20_menos_betas_validas,50011886,0,0.0,0 validas de 71 ventanas
+top_20_menos_betas_validas,50011888,0,0.0,0 validas de 59 ventanas
+top_20_menos_betas_validas,50011906,0,0.0,0 validas de 14 ventanas
+top_20_menos_betas_validas,50011913,0,0.0,0 validas de 44 ventanas
+top_20_menos_betas_validas,50019485,0,0.0,0 validas de 2 ventanas
+top_20_menos_betas_validas,50019489,0,0.0,0 validas de 44 ventanas
+top_20_menos_betas_validas,50019490,0,0.0,0 validas de 17 ventanas
+top_20_menos_betas_validas,50020484,0,0.0,0 validas de 41 ventanas
+top_20_menos_betas_validas,50020487,0,0.0,0 validas de 2 ventanas
+top_20_menos_betas_validas,50024465,0,0.0,0 validas de 71 ventanas
+top_20_menos_betas_validas,50026534,0,0.0,0 validas de 44 ventanas
+top_20_menos_betas_validas,50026535,0,0.0,0 validas de 1 ventanas
+top_20_menos_betas_validas,50026536,0,0.0,0 validas de 1 ventanas
+top_20_menos_betas_validas,50027483,0,0.0,0 validas de 1 ventanas
+top_20_menos_betas_validas,50027536,0,0.0,0 validas de 8 ventanas
+top_20_menos_betas_validas,50027540,0,0.0,0 validas de 62 ventanas
+top_20_menos_betas_validas,50027544,0,0.0,0 validas de 74 ventanas
+top_20_menos_betas_validas,50030080,0,0.0,0 validas de 1 ventanas
+top_20_menos_betas_validas,50032997,0,0.0,0 validas de 62 ventanas

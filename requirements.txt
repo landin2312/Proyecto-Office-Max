@@ -1,0 +1,8 @@
+pdfplumber
+camelot-py
+python-docx
+pandas
+openpyxl
+regex
+textract
+pywin32

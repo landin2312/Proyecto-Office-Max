@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Temporary conversion/output folders
+output/_tmp/
+
+# Local system files
+.DS_Store
+Thumbs.db
