@@ -87,8 +87,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   display:flex;align-items:center;gap:8px
 }
 .section-body{
-  display:grid;grid-template-columns:180px 1fr 260px;gap:18px;align-items:start
+  display:grid;grid-template-columns:180px minmax(0,1fr) 260px;gap:18px;align-items:start
 }
+/* El chart-wrap es el grid item real; Chart.js lee su clientWidth */
+.chart-wrap{min-width:0;position:relative}
+.chart-wrap canvas{display:block}
 @media(max-width:1024px){.section-body{grid-template-columns:1fr}}
 
 /* ── KPI pequeño (Vista 1) ──────────────────────────────── */
@@ -411,7 +414,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="lbl">Incremento de ingresos con la mejor promoción</div>
         <div class="chg pos">↑ vs sin promoción</div>
       </div>
-      <canvas id="chart-promo" style="max-height:220px"></canvas>
+      <div class="chart-wrap"><canvas id="chart-promo" style="max-height:220px"></canvas></div>
       <div class="interp-box">
         <div class="interp-hdr">💡 Interpretación</div>
         <div class="interp-txt" id="interp-1">
@@ -435,7 +438,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="lbl">SKUs altamente elásticos al precio</div>
         <div class="chg neg">↑ sensibles a cambios</div>
       </div>
-      <canvas id="chart-scatter" style="max-height:220px"></canvas>
+      <div class="chart-wrap"><canvas id="chart-scatter" style="max-height:220px"></canvas></div>
       <div class="interp-box">
         <div class="interp-hdr">💡 Interpretación</div>
         <div class="interp-txt" id="interp-2">
@@ -454,7 +457,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="lbl">Incremento promedio en ventas durante promoción</div>
         <div class="chg pos">↑ pico durante promo</div>
       </div>
-      <canvas id="chart-temporal" style="max-height:220px"></canvas>
+      <div class="chart-wrap"><canvas id="chart-temporal" style="max-height:220px"></canvas></div>
       <div class="interp-box">
         <div class="interp-hdr">💡 Interpretación</div>
         <div class="interp-txt" id="interp-3">
@@ -766,6 +769,8 @@ function switchView(v) {
   document.getElementById('vista2').style.display = v === 'vista2' ? 'block' : 'none';
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.querySelector(`[data-view="${v}"]`).classList.add('active');
+  /* Re-renderizar sparklines ahora que el canvas tiene dimensiones reales */
+  if (v === 'vista2') requestAnimationFrame(() => updateSim());
 }
 
 /* ── Helpers de UI ──────────────────────────────────────── */
@@ -931,7 +936,7 @@ function renderChartTemporal() {
       id: 'promoLine',
       afterDraw(chart) {
         const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
-        const xPos = x.getPixelForIndex(4);
+        const xPos = x.getPixelForValue(chart.data.labels[4]);
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(xPos, top);
