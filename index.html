@@ -304,12 +304,34 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   border-radius:24px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer
 }
 
+/* ── CSV Upload Bar ─────────────────────────────────────── */
+.csv-bar{
+  background:#fff;border-bottom:1px solid var(--border);
+  padding:9px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap
+}
+.csv-btn{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 16px;
+  background:var(--navy);color:#fff;border-radius:8px;font-size:13px;
+  font-weight:600;cursor:pointer;white-space:nowrap;
+  font-family:'Inter',sans-serif;transition:opacity .2s;flex-shrink:0
+}
+.csv-btn:hover{opacity:.85}
+.csv-hint{font-size:12px;color:#999}
+.csv-ok{color:var(--green);font-weight:600;font-size:12px}
+.csv-err{color:var(--red);font-weight:600;font-size:12px}
+/* Overlay "Sin datos" dentro de chart-wrap */
+.no-data-ov{
+  position:absolute;inset:0;align-items:center;justify-content:center;
+  font-size:13px;color:#aaa;background:rgba(255,255,255,.88);display:none
+}
+
 /* ── Responsive ─────────────────────────────────────────── */
 @media(max-width:768px){
   .main-content{padding:12px}
   .app-header{flex-wrap:wrap;height:auto;padding:10px 14px;gap:8px}
   .kpi-grid{grid-template-columns:1fr}
   .chat-panel{width:100%;right:-100%}
+  .csv-bar{padding:9px 14px}
 }
 </style>
 </head>
@@ -336,9 +358,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
   <div id="status-badge" class="status-badge offline">
     <span class="status-dot offline" id="status-dot"></span>
-    <span id="status-text">🔴 Modo offline</span>
+    <span id="status-text">🟡 Modo interpretación manual</span>
   </div>
 </header>
+
+<!-- ════════════ CSV UPLOAD BAR ═════════════════════════════ -->
+<div class="csv-bar">
+  <label class="csv-btn" for="csv-file-input">📂 Cargar base de datos (.csv)</label>
+  <input type="file" id="csv-file-input" accept=".csv" style="display:none">
+  <span id="csv-status" class="csv-hint">Usando datos demo · Carga tu CSV para análisis real</span>
+</div>
 
 <!-- ════════════════════════ MAIN ══════════════════════════ -->
 <div class="main-content">
@@ -695,25 +724,25 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <!-- ════════════════════════ JS ════════════════════════════ -->
 <script>
-/* ── Datos mock (modo demo sin backend) ─────────────────── */
-const SKUS = [
-  { id:'50077229', name:'Papel Copia OMX 92 75G',  e:-1.85, sales:18300, price:1120, cost:780,  cat:'Papel Bond',      brand:'OfficeMax', icon:'🗒️' },
-  { id:'50106204', name:'Marathon Resma 500 Hojas', e:-1.12, sales:12400, price:890,  cost:620,  cat:'Papel Bond',      brand:'Marathon',  icon:'📄' },
-  { id:'50084493', name:'Papel Xerox Ecologico TC', e:-0.74, sales:8700,  price:1050, cost:730,  cat:'Papel Ecológico', brand:'Xerox',     icon:'♻️' },
-  { id:'50091122', name:'Papel Bond 75g Resma',     e:-0.45, sales:6200,  price:750,  cost:520,  cat:'Papel Bond',      brand:'Generic',   icon:'📋' },
-  { id:'50033841', name:'Papel Reciclado 60g',      e:0.12,  sales:3100,  price:680,  cost:480,  cat:'Papel Reciclado', brand:'EcoOffice', icon:'🌿' }
+/* ══════════════════════════════════════════════════════════
+   DATOS MOCK — fallback si no se carga CSV
+══════════════════════════════════════════════════════════ */
+let SKUS = [
+  { id:'50077229', name:'Papel Copia OMX 92 75G',  e:-1.85, sales:18300, price:1120, cost:780,  cat:'Papel Bond',      brand:'OfficeMax', dept:'papel', icon:'🗒️' },
+  { id:'50106204', name:'Marathon Resma 500 Hojas', e:-1.12, sales:12400, price:890,  cost:620,  cat:'Papel Bond',      brand:'Marathon',  dept:'papel', icon:'📄' },
+  { id:'50084493', name:'Papel Xerox Ecologico TC', e:-0.74, sales:8700,  price:1050, cost:730,  cat:'Papel Ecológico', brand:'Xerox',     dept:'papel', icon:'♻️' },
+  { id:'50091122', name:'Papel Bond 75g Resma',     e:-0.45, sales:6200,  price:750,  cost:520,  cat:'Papel Bond',      brand:'Generic',   dept:'papel', icon:'📋' },
+  { id:'50033841', name:'Papel Reciclado 60g',      e:0.12,  sales:3100,  price:680,  cost:480,  cat:'Papel Reciclado', brand:'EcoOffice', dept:'papel', icon:'🌿' }
 ];
 
 const PROMO_MOCK = {
   labels: ['Desc. 15%','Desc. 20%','3x2','2x1','Otros'],
   data:   [32, 28, 22, 18, 8]
 };
-
 const TEMPORAL_MOCK = {
   labels: ['-4 sem','-3 sem','-2 sem','-1 sem','Inicio','+1 sem','+2 sem','+3 sem','+4 sem'],
   data:   [100, 102, 98, 101, 127, 134, 119, 112, 104]
 };
-
 const MOCK_TEXTS = {
   i1: 'Los descuentos del 15% y 20% generan el mayor incremento de ingresos en PAPEL. Se recomienda priorizarlos en temporadas de alta demanda como Regreso a Clases.',
   i2: 'El SKU 50077229 (Papel Copia OMX) es el más sensible al precio con elasticidad −1.85. Un ajuste de 10% en precio puede generar hasta un 18% de variación en ventas.',
@@ -722,45 +751,359 @@ const MOCK_TEXTS = {
 };
 
 /* ── Estado global ──────────────────────────────────────── */
-let ollamaOk = false;
-let activeSKU = SKUS[0];
+let activeSKU   = SKUS[0];
+let allRows     = [];      // filas del CSV cargado
+let csvLoaded   = false;
 let chatHistory = [];
-let charts = {};
+let charts      = {};
 let debounceTimer = null;
 
-/* ── Comunicación con Qwen2 vía Ollama ──────────────────── */
-async function askQwen(prompt, timeout = 15000) {
+/* ══════════════════════════════════════════════════════════
+   ARREGLO 3 — QWEN SIN PING INICIAL
+   Siempre intenta la llamada real. Badge = resultado de la ÚLTIMA llamada.
+══════════════════════════════════════════════════════════ */
+async function askQwen(prompt) {
   try {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), timeout);
     const res = await fetch('http://localhost:11434/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'qwen2', prompt, stream: false }),
-      signal: ctrl.signal
+      body: JSON.stringify({ model: 'qwen2', prompt, stream: false })
     });
-    clearTimeout(tid);
-    const d = await res.json();
-    return d.response || null;
+    const data = await res.json();
+    const response = data.response ?? null;
+    if (response) setBadge(true);
+    return response;
   } catch { return null; }
 }
 
-/* ── Ping inicial a Ollama ──────────────────────────────── */
-async function pingOllama() {
-  try {
-    const r = await fetch('http://localhost:11434/api/tags', { method: 'GET' });
-    if (r.ok) { ollamaOk = true; setBadge(true); return; }
-  } catch {}
-  ollamaOk = false; setBadge(false);
-}
-
-function setBadge(online) {
+function setBadge(active) {
   const b = document.getElementById('status-badge');
   const d = document.getElementById('status-dot');
   const t = document.getElementById('status-text');
-  b.className = 'status-badge ' + (online ? 'online' : 'offline');
-  d.className = 'status-dot ' + (online ? 'online' : 'offline');
-  t.textContent = online ? '🟢 Qwen2 conectado' : '🔴 Modo offline';
+  if (active) {
+    b.className = 'status-badge online';
+    d.className = 'status-dot online';
+    t.textContent = '🟢 Qwen2 activo';
+  } else {
+    b.className = 'status-badge offline';
+    d.className = 'status-dot offline';
+    t.textContent = '🟡 Modo interpretación manual';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   ARREGLO 1 — CARGA Y PARSEO DE CSV
+══════════════════════════════════════════════════════════ */
+// Divide una línea CSV respetando campos entre comillas
+function splitCSVLine(line) {
+  const res = []; let cur = '', inQ = false;
+  for (const ch of line) {
+    if (ch === '"') { inQ = !inQ; continue; }
+    if (ch === ',' && !inQ) { res.push(cur.trim()); cur = ''; continue; }
+    cur += ch;
+  }
+  res.push(cur.trim());
+  return res;
+}
+
+function parseCSVText(text) {
+  const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
+  if (lines.length < 2) throw new Error('El CSV está vacío o solo tiene encabezado.');
+
+  // Normalizar headers: minúsculas, sin acentos complicados, espacios → _
+  const headers = splitCSVLine(lines[0]).map(h =>
+    h.toLowerCase().trim().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'_')
+  );
+
+  const mandatory = ['sku','unidades','venta_neta'];
+  const missing = mandatory.filter(c => !headers.includes(c));
+  if (missing.length) throw new Error(`Columnas obligatorias faltantes: ${missing.join(', ')}`);
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = splitCSVLine(lines[i]);
+    if (vals.length < 2) continue;
+    const row = {};
+    headers.forEach((h, j) => { row[h] = (vals[j] || '').replace(/^"|"$/g, ''); });
+    // Calcular precio si no viene
+    if (!row.precio || row.precio === '') {
+      const u = parseFloat(row.unidades) || 1;
+      const v = parseFloat(row.venta_neta) || 0;
+      row.precio = u > 0 ? String(v / u) : '0';
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+// Regresión log-log por mínimos cuadrados: devuelve elasticidad (pendiente)
+function estimateElasticityLS(prices, units) {
+  const n = prices.length;
+  if (n < 2) return null;
+  const lx = prices.map(p => Math.log(Math.max(p, 0.01)));
+  const ly = units.map(u  => Math.log(u + 1));
+  const mX = lx.reduce((a,b)=>a+b,0)/n;
+  const mY = ly.reduce((a,b)=>a+b,0)/n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) { num += (lx[i]-mX)*(ly[i]-mY); den += (lx[i]-mX)**2; }
+  return den > 1e-10 ? parseFloat((num/den).toFixed(3)) : null;
+}
+
+// Clasifica una elasticidad → { cls, lbl, color }
+function classifyE(e) {
+  if (e === null || e === undefined || isNaN(e))
+    return { cls:'border',    lbl:'Sin datos',  color:'#888' };
+  if (e < -1)  return { cls:'elastic',   lbl:'Elástico',    color:'var(--red)' };
+  if (e <  0)  return { cls:'border',    lbl:'Inelástico',  color:'var(--orange)' };
+  return             { cls:'inelastic', lbl:'Sospechoso',  color:'var(--green)' };
+}
+
+// Construye array SKUS desde filas del CSV
+function buildSKUsFromRows(rows) {
+  const map = {};
+  rows.forEach(r => {
+    const id = r.sku || r.prod_nbr || 'UNKNOWN';
+    if (!map[id]) map[id] = [];
+    map[id].push(r);
+  });
+
+  return Object.entries(map).map(([id, sr]) => {
+    const prices  = sr.map(r => parseFloat(r.precio)).filter(p => p > 0);
+    const units   = sr.map(r => parseFloat(r.unidades)).filter(u => !isNaN(u) && u >= 0);
+    const incomes = sr.map(r => parseFloat(r.venta_neta)).filter(v => !isNaN(v));
+
+    const eCSV  = sr[0]?.elasticidad ? parseFloat(sr[0].elasticidad) : NaN;
+    const eCalc = isFinite(eCSV) ? eCSV : estimateElasticityLS(prices, units);
+    const e     = eCalc ?? -1.0;
+
+    const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+    const avgPrice = avg(prices);
+    const costRaw  = sr.find(r => r.costo && parseFloat(r.costo) > 0);
+    const cost     = costRaw ? parseFloat(costRaw.costo) : avgPrice * 0.7;
+
+    // Intentar varios nombres de columna posibles
+    const nombre = sr[0]?.nombre || sr[0]?.descripcion || sr[0]?.prod_nm ||
+                   sr[0]?.brand  || id;
+    const cat    = sr[0]?.categoria || sr[0]?.class_nm  || sr[0]?.subdept_nm || 'Sin categoría';
+    const brand  = sr[0]?.marca     || sr[0]?.tipo_marca || sr[0]?.vendor_nm  || 'Sin marca';
+    const dept   = (sr[0]?.departamento || sr[0]?.dept_nm || 'sin departamento').toLowerCase();
+
+    return { id, name: nombre, e, sales: avg(units), price: avgPrice,
+             cost, cat, brand, dept, icon: '📦', rawRows: sr };
+  });
+}
+
+// Repobla los dropdowns de filtros con datos del CSV
+function populateFilters(skus) {
+  // SKU filter
+  const skuSel = document.getElementById('sku-filter');
+  skuSel.innerHTML = '<option value="todos">Todos</option>';
+  skus.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = `${s.id} — ${s.name.slice(0,28)}`;
+    skuSel.appendChild(o);
+  });
+
+  // Dept filter (solo si el CSV trae datos de departamento)
+  const depts = [...new Set(skus.map(s=>s.dept).filter(d => d && d !== 'sin departamento'))];
+  if (depts.length > 0) {
+    const dSel = document.getElementById('dept-filter');
+    dSel.innerHTML = '<option value="todos">Todos</option>';
+    depts.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d;
+      o.textContent = d.charAt(0).toUpperCase() + d.slice(1);
+      dSel.appendChild(o);
+    });
+  }
+
+  // Vista 2 SKU select
+  const v2Sel = document.getElementById('v2-sku');
+  v2Sel.innerHTML = '';
+  skus.slice(0, 100).forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = `${s.id} — ${s.name.slice(0,32)}`;
+    v2Sel.appendChild(o);
+  });
+}
+
+// Listener del input de archivo
+document.getElementById('csv-file-input').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('csv-status').innerHTML =
+    '<span class="loading-line"><span class="spinner"></span> Procesando CSV…</span>';
+
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      allRows = parseCSVText(ev.target.result);
+      SKUS    = buildSKUsFromRows(allRows);
+      if (SKUS.length === 0) throw new Error('No se encontraron SKUs válidos en el archivo.');
+      csvLoaded = true;
+      populateFilters(SKUS);
+      activeSKU = SKUS[0];
+      document.getElementById('csv-status').innerHTML =
+        `<span class="csv-ok">✅ ${file.name} · ${SKUS.length} SKUs · ${allRows.length.toLocaleString('es-MX')} filas</span>`;
+      applyFilters();
+      updateSKU();
+      renderSKUTable();
+    } catch(err) {
+      document.getElementById('csv-status').innerHTML =
+        `<span class="csv-err">❌ ${err.message}</span>`;
+    }
+  };
+  reader.onerror = () => {
+    document.getElementById('csv-status').innerHTML =
+      '<span class="csv-err">❌ No se pudo leer el archivo.</span>';
+  };
+  reader.readAsText(file, 'UTF-8');
+});
+
+/* ══════════════════════════════════════════════════════════
+   ARREGLO 2 — FILTROS REACTIVOS
+   filterData() → datos activos filtrados
+   updateCharts() → actualiza Chart.js sin recrear
+══════════════════════════════════════════════════════════ */
+function filterData() {
+  const dept  = document.getElementById('dept-filter').value;
+  const cat   = document.getElementById('cat-filter').value;
+  const skuF  = document.getElementById('sku-filter').value;
+  const promo = document.getElementById('promo-filter').value;
+  const from  = document.getElementById('date-from').value;
+  const to    = document.getElementById('date-to').value;
+
+  if (!csvLoaded) {
+    // Modo mock: filtra el array SKUS directamente
+    let filtered = [...SKUS];
+    if (dept !== 'todos') filtered = filtered.filter(s =>
+      s.dept === dept || s.dept.includes(dept) || s.cat.toLowerCase().includes(dept));
+    if (cat  !== 'todos') filtered = filtered.filter(s =>
+      s.cat.toLowerCase().includes(cat));
+    if (skuF !== 'todos') filtered = filtered.filter(s => s.id === skuF);
+    return { skus: filtered, rows: [] };
+  }
+
+  // Modo CSV: filtra filas con varios alias de columna
+  let rows = [...allRows];
+  if (dept  !== 'todos') rows = rows.filter(r =>
+    (r.departamento||r.dept_nm||'').toLowerCase().includes(dept));
+  if (cat   !== 'todos') rows = rows.filter(r =>
+    (r.categoria||r.class_nm||r.subdept_nm||'').toLowerCase().includes(cat));
+  if (skuF  !== 'todos') rows = rows.filter(r =>
+    (r.sku||r.prod_nbr||'') === skuF);
+  if (promo !== 'todos') rows = rows.filter(r =>
+    (r.promocion||r.promo||'').toLowerCase().includes(promo));
+  if (from) rows = rows.filter(r => (r.fecha||r.tran_date||'') >= from);
+  if (to)   rows = rows.filter(r => (r.fecha||r.tran_date||'') <= to);
+
+  return { skus: buildSKUsFromRows(rows), rows };
+}
+
+// Muestra overlay "Sin datos" sobre un chart-wrap
+function showNoData(chartId) {
+  const ch = charts[chartId.replace('chart-','')];
+  if (ch) { ch.data.datasets.forEach(ds => { ds.data = []; }); ch.update(); }
+  const wrap = document.getElementById(chartId)?.parentElement;
+  if (!wrap) return;
+  let ov = wrap.querySelector('.no-data-ov');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.className = 'no-data-ov';
+    ov.textContent = 'Sin datos para este filtro';
+    wrap.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+}
+function clearNoData(chartId) {
+  const ov = document.getElementById(chartId)?.parentElement?.querySelector('.no-data-ov');
+  if (ov) ov.style.display = 'none';
+}
+
+// Actualiza las 3 gráficas y KPIs usando chart.update() (sin recrear)
+function updateCharts(filtered) {
+  const { skus, rows } = filtered;
+
+  if (skus.length === 0) {
+    ['chart-promo','chart-scatter','chart-temporal'].forEach(showNoData);
+    ['s1-val','s2-val','s3-val'].forEach(id => {
+      document.getElementById(id).textContent = '--';
+    });
+    return;
+  }
+  ['chart-promo','chart-scatter','chart-temporal'].forEach(clearNoData);
+
+  /* ── Chart 1: Ingresos por tipo de promoción ── */
+  let promoLabels, promoData;
+  if (csvLoaded && rows.length > 0) {
+    const byPromo = {};
+    rows.forEach(r => {
+      const p = r.promocion || r.promo || 'Sin promo';
+      if (!byPromo[p]) byPromo[p] = 0;
+      byPromo[p] += parseFloat(r.venta_neta) || 0;
+    });
+    const sinBase = byPromo['Sin promo'] || Math.min(...Object.values(byPromo)) || 1;
+    promoLabels = Object.keys(byPromo).filter(k => k !== 'Sin promo').slice(0, 5);
+    promoData   = promoLabels.map(p => parseFloat(((byPromo[p]/sinBase - 1)*100).toFixed(1)));
+    if (promoLabels.length === 0) { promoLabels = PROMO_MOCK.labels; promoData = PROMO_MOCK.data; }
+  } else {
+    const f = SKUS.length > 0 ? skus.length / SKUS.length : 1;
+    promoLabels = PROMO_MOCK.labels;
+    promoData   = PROMO_MOCK.data.map(v => parseFloat((v * f).toFixed(1)));
+  }
+  if (charts.promo) {
+    charts.promo.data.labels = promoLabels;
+    charts.promo.data.datasets[0].data = promoData;
+    charts.promo.data.datasets[0].backgroundColor =
+      promoLabels.map((_,i) => ['#1A2E5A','#2d4a8a','#4a74cc','#7aa3e8','#b8cff5'][i%5]);
+    charts.promo.update('active');
+  }
+  const maxInc = promoData.length ? Math.max(...promoData) : 0;
+  document.getElementById('s1-val').textContent = `${maxInc>=0?'+':''}${maxInc.toFixed(0)}%`;
+
+  /* ── Chart 2: Scatter elasticidad ── */
+  const pts  = skus.map(s => ({ x: s.sales, y: s.e, label: s.name }));
+  const clrs = skus.map(s => s.e < -1 ? '#E53935' : s.e < -0.5 ? '#F5A623' : '#00A86B');
+  if (charts.scatter) {
+    charts.scatter.data.datasets[0].data = pts;
+    charts.scatter.data.datasets[0].backgroundColor = clrs;
+    const maxX = Math.max(...skus.map(s => s.sales), 1000) * 1.1;
+    charts.scatter.data.datasets[1].data = [{ x:0, y:-1 }, { x:maxX, y:-1 }];
+    charts.scatter.update('active');
+  }
+  const elasticPct = skus.length ? Math.round(skus.filter(s=>s.e<-1).length/skus.length*100) : 0;
+  document.getElementById('s2-val').textContent = `${elasticPct}%`;
+
+  /* ── Chart 3: Temporal ── */
+  let tempLabels, tempData;
+  if (csvLoaded && rows.length > 0) {
+    const sorted = [...rows].sort((a,b) =>
+      (a.fecha||a.tran_date||'') < (b.fecha||b.tran_date||'') ? -1 : 1);
+    const chunkSz = Math.max(1, Math.floor(sorted.length / 9));
+    const avgs = Array.from({length:9}, (_,i) => {
+      const ch = sorted.slice(i*chunkSz, (i+1)*chunkSz);
+      return ch.reduce((s,r) => s+(parseFloat(r.unidades)||0), 0) / (ch.length||1);
+    });
+    const base = avgs[0] || 1;
+    tempData   = avgs.map(v => Math.round(v/base*100));
+    tempLabels = TEMPORAL_MOCK.labels;
+  } else {
+    const avgE = skus.reduce((a,s)=>a+s.e,0) / (skus.length||1);
+    tempData   = TEMPORAL_MOCK.data.map((v,i) =>
+      i >= 4 ? Math.round(v * (1 + Math.abs(avgE) * 0.05)) : v);
+    tempLabels = TEMPORAL_MOCK.labels;
+  }
+  if (charts.temporal) {
+    charts.temporal.data.labels = tempLabels;
+    charts.temporal.data.datasets[0].data = tempData;
+    charts.temporal.update('active');
+  }
+  const preAvg  = (tempData.slice(0,4).reduce((a,b)=>a+b,0)/4) || 100;
+  const postAvg =  tempData.slice(4).reduce((a,b)=>a+b,0)/5;
+  const inc3    = Math.round((postAvg/preAvg - 1)*100);
+  document.getElementById('s3-val').textContent = `${inc3>=0?'+':''}${inc3}%`;
 }
 
 /* ── Cambio de vista ────────────────────────────────────── */
@@ -769,55 +1112,60 @@ function switchView(v) {
   document.getElementById('vista2').style.display = v === 'vista2' ? 'block' : 'none';
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.querySelector(`[data-view="${v}"]`).classList.add('active');
-  /* Re-renderizar sparklines ahora que el canvas tiene dimensiones reales */
   if (v === 'vista2') requestAnimationFrame(() => updateSim());
 }
 
-/* ── Helpers de UI ──────────────────────────────────────── */
+/* ── UI helpers ─────────────────────────────────────────── */
 function setLoading(id) {
   document.getElementById(id).innerHTML =
     '<span class="loading-line"><span class="spinner"></span> PromoIntel está analizando…</span>';
 }
-function setText(id, txt, offline = false) {
+function setText(id, txt, manual = false) {
   document.getElementById(id).innerHTML =
     `<span class="fade-in">${txt}</span>` +
-    (offline ? ' <span class="offline-badge">⚠️ Modo offline</span>' : '');
+    (manual ? ' <span class="offline-badge">⚠️ Modo manual</span>' : '');
 }
 
-/* ── Cargar interpretaciones (Vista 1) ──────────────────── */
+/* ── Interpretaciones Qwen (Vista 1) ────────────────────── */
 async function loadInterps() {
-  const dept = document.getElementById('dept-filter').value.toUpperCase();
-  const promoSel = document.getElementById('promo-filter').value;
+  const dept      = document.getElementById('dept-filter').value.toUpperCase();
+  const promoSel  = document.getElementById('promo-filter').value;
   const promoLabel = promoSel === 'todos' ? 'Desc. 15%' : promoSel;
+  const filtered  = filterData();
+  const skus      = filtered.skus;
+  const topE      = [...skus].sort((a,b) => a.e - b.e)[0];
+  const ePct      = skus.length ? Math.round(skus.filter(s=>s.e<-1).length/skus.length*100) : 60;
+  const s1Txt     = document.getElementById('s1-val').textContent || '+32%';
+  const s3Txt     = document.getElementById('s3-val').textContent || '+27%';
 
   ['interp-1','interp-2','interp-3','key-insight'].forEach(setLoading);
 
-  const p1 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el tipo de promoción ${promoLabel} generó un incremento de 32% en ingresos vs escenario sin promoción. El SKU más elástico es Papel Copia OMX 92 con elasticidad -1.85. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
+  const p1 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el tipo de promoción ${promoLabel} generó un incremento de ${s1Txt} en ingresos vs escenario sin promoción. El SKU más elástico es ${topE?.name||'N/A'} con elasticidad ${topE?.e??'-1.85'}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
   const r1 = await askQwen(p1);
+  if (!r1) setBadge(false);
   setText('interp-1', r1 || MOCK_TEXTS.i1, !r1);
 
-  const p2 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el 60% de los SKUs son altamente elásticos al precio. El SKU más sensible es Papel Copia OMX 92 con elasticidad -1.85 y ventas promedio de 18,300 unidades. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
+  const p2 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el ${ePct}% de los SKUs son altamente elásticos al precio. El SKU más sensible es ${topE?.name||'N/A'} con elasticidad ${topE?.e??'-1.85'} y ventas promedio de ${Math.round(topE?.sales||18300).toLocaleString('es-MX')} unidades. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
   const r2 = await askQwen(p2);
   setText('interp-2', r2 || MOCK_TEXTS.i2, !r2);
 
-  const p3 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, las ventas aumentan 27% durante las promociones y regresan a niveles base en 2-3 semanas. El tipo de promoción más efectivo es ${promoLabel}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
+  const p3 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, las ventas cambian ${s3Txt} durante las promociones. El tipo de promoción más efectivo es ${promoLabel}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
   const r3 = await askQwen(p3);
   setText('interp-3', r3 || MOCK_TEXTS.i3, !r3);
 
-  const p4 = `Dado el análisis del departamento ${dept} (mejor promoción: ${promoLabel}, elasticidad promedio: -1.03, incremento ventas: 27%), genera UN insight accionable de negocio en una sola oración, en español.`;
+  const p4 = `Dado el análisis del departamento ${dept} (mejor promoción: ${promoLabel}, SKUs elásticos: ${ePct}%, cambio en ventas: ${s3Txt}), genera UN insight accionable de negocio en una sola oración, en español.`;
   const r4 = await askQwen(p4);
   setText('key-insight', r4 || MOCK_TEXTS.insight, !r4);
 }
 
-/* ── Filtros Vista 1 ────────────────────────────────────── */
+/* ── Filtros Vista 1: filtra + actualiza gráficas + llama Qwen ── */
 function applyFilters() {
-  renderChartPromo();
-  renderChartScatter();
-  renderChartTemporal();
+  const filtered = filterData();
+  updateCharts(filtered);
   loadInterps();
 }
 
-/* ── Gráfica 1: Barras de ingresos por promo ────────────── */
+/* ── Render inicial de gráficas (crea instancias Chart.js) ── */
 function renderChartPromo() {
   const ctx = document.getElementById('chart-promo').getContext('2d');
   if (charts.promo) charts.promo.destroy();
@@ -828,8 +1176,7 @@ function renderChartPromo() {
       datasets: [{
         data: PROMO_MOCK.data,
         backgroundColor: ['#1A2E5A','#2d4a8a','#4a74cc','#7aa3e8','#b8cff5'],
-        borderRadius: 6,
-        borderSkipped: false
+        borderRadius: 6, borderSkipped: false
       }]
     },
     options: {
@@ -846,79 +1193,49 @@ function renderChartPromo() {
   });
 }
 
-/* ── Gráfica 2: Scatter elasticidad ─────────────────────── */
 function renderChartScatter() {
-  const ctx = document.getElementById('chart-scatter').getContext('2d');
+  const ctx  = document.getElementById('chart-scatter').getContext('2d');
   if (charts.scatter) charts.scatter.destroy();
-
-  const pts = SKUS.map(s => ({ x: s.sales, y: s.e, label: s.name }));
-  const clrs = SKUS.map(s =>
-    s.e < -1 ? '#E53935' : s.e < -0.5 ? '#F5A623' : '#00A86B');
-
+  const pts  = SKUS.map(s => ({ x: s.sales, y: s.e, label: s.name }));
+  const clrs = SKUS.map(s => s.e < -1 ? '#E53935' : s.e < -0.5 ? '#F5A623' : '#00A86B');
   charts.scatter = new Chart(ctx, {
     type: 'scatter',
     data: {
       datasets: [
-        {
-          label: 'SKUs',
-          data: pts,
-          backgroundColor: clrs,
-          pointRadius: 9,
-          pointHoverRadius: 12
-        },
-        {
-          type: 'line',
-          label: 'β = −1 (umbral)',
-          data: [{ x: 0, y: -1 }, { x: 22000, y: -1 }],
-          borderColor: '#999',
-          borderDash: [5, 4],
-          borderWidth: 1.5,
-          pointRadius: 0,
-          fill: false
-        }
+        { label:'SKUs', data:pts, backgroundColor:clrs, pointRadius:9, pointHoverRadius:12 },
+        { type:'line', label:'β=−1', data:[{x:0,y:-1},{x:22000,y:-1}],
+          borderColor:'#999', borderDash:[5,4], borderWidth:1.5, pointRadius:0, fill:false }
       ]
     },
     options: {
       responsive: true,
       plugins: {
         legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: c => c.datasetIndex === 0
-              ? [`📦 ${c.raw.label}`, `Ventas: ${c.raw.x.toLocaleString('es-MX')}`, `Elasticidad: ${c.raw.y}`]
-              : 'Umbral elástico (β=−1)'
-          }
-        }
+        tooltip: { callbacks: { label: c => c.datasetIndex===0
+          ? [`📦 ${c.raw.label}`,`Ventas: ${c.raw.x.toLocaleString('es-MX')}`,`Elasticidad: ${c.raw.y}`]
+          : 'Umbral elástico (β=−1)' } }
       },
       scales: {
-        x: { title: { display: true, text: 'Ventas prom. mensuales', font: { size: 11 } },
-             ticks: { callback: v => v.toLocaleString('es-MX') }, grid: { color: '#f0f0f0' } },
-        y: { title: { display: true, text: 'Elasticidad (β)', font: { size: 11 } },
-             grid: { color: '#f0f0f0' } }
+        x: { title:{display:true,text:'Ventas prom. mensuales',font:{size:11}},
+             ticks:{callback:v=>v.toLocaleString('es-MX')}, grid:{color:'#f0f0f0'} },
+        y: { title:{display:true,text:'Elasticidad (β)',font:{size:11}}, grid:{color:'#f0f0f0'} }
       }
     }
   });
 }
 
-/* ── Gráfica 3: Línea temporal ──────────────────────────── */
 function renderChartTemporal() {
   const ctx = document.getElementById('chart-temporal').getContext('2d');
   if (charts.temporal) charts.temporal.destroy();
-
   charts.temporal = new Chart(ctx, {
     type: 'line',
     data: {
       labels: TEMPORAL_MOCK.labels,
       datasets: [{
-        label: 'Índice de ventas',
-        data: TEMPORAL_MOCK.data,
-        borderColor: '#1A2E5A',
-        backgroundColor: 'rgba(26,46,90,0.07)',
-        borderWidth: 2.5,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 5,
-        pointBackgroundColor: '#1A2E5A'
+        label:'Índice de ventas', data:TEMPORAL_MOCK.data,
+        borderColor:'#1A2E5A', backgroundColor:'rgba(26,46,90,0.07)',
+        borderWidth:2.5, fill:true, tension:0.4,
+        pointRadius:5, pointBackgroundColor:'#1A2E5A'
       }]
     },
     options: {
@@ -928,27 +1245,22 @@ function renderChartTemporal() {
         tooltip: { callbacks: { label: c => `Índice: ${c.raw} (base 100)` } }
       },
       scales: {
-        y: { min: 85, ticks: { callback: v => v }, grid: { color: '#f0f0f0' } },
-        x: { grid: { color: '#f0f0f0' } }
+        y: { min:85, ticks:{callback:v=>v}, grid:{color:'#f0f0f0'} },
+        x: { grid:{color:'#f0f0f0'} }
       }
     },
     plugins: [{
       id: 'promoLine',
       afterDraw(chart) {
-        const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
-        const xPos = x.getPixelForValue(chart.data.labels[4]);
+        const { ctx, chartArea:{top,bottom}, scales:{x} } = chart;
+        if (!chart.data.labels?.length) return;
+        const idx4 = Math.min(4, chart.data.labels.length - 1);
+        const xPos = x.getPixelForValue(chart.data.labels[idx4]);
         ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(xPos, top);
-        ctx.lineTo(xPos, bottom);
-        ctx.strokeStyle = '#E53935';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 4]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#E53935';
-        ctx.font = '11px Inter,sans-serif';
-        ctx.fillText('Inicio promo', xPos + 5, top + 14);
+        ctx.beginPath(); ctx.moveTo(xPos,top); ctx.lineTo(xPos,bottom);
+        ctx.strokeStyle='#E53935'; ctx.lineWidth=2; ctx.setLineDash([5,4]); ctx.stroke();
+        ctx.setLineDash([]); ctx.fillStyle='#E53935';
+        ctx.font='11px Inter,sans-serif'; ctx.fillText('Inicio promo',xPos+5,top+14);
         ctx.restore();
       }
     }]
@@ -962,80 +1274,68 @@ function renderSpark(id, data, color) {
   if (el._spChart) el._spChart.destroy();
   el._spChart = new Chart(el.getContext('2d'), {
     type: 'line',
-    data: {
-      labels: data.map((_,i) => i),
-      datasets: [{ data, borderColor: color, borderWidth: 2, fill: false,
-                   tension: 0.4, pointRadius: 0 }]
-    },
+    data: { labels:data.map((_,i)=>i),
+            datasets:[{data,borderColor:color,borderWidth:2,fill:false,tension:0.4,pointRadius:0}] },
     options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      scales: { x: { display: false }, y: { display: false } },
-      animation: { duration: 250 }
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{x:{display:false},y:{display:false}},
+      animation:{duration:250}
     }
   });
 }
 
-/* ── Vista 2: Actualizar producto ───────────────────────── */
+/* ── Vista 2: Actualizar SKU seleccionado ───────────────── */
 function updateSKU() {
-  const id = document.getElementById('v2-sku').value;
+  const id  = document.getElementById('v2-sku').value;
   activeSKU = SKUS.find(s => s.id === id) || SKUS[0];
+  if (!activeSKU) return;
 
-  document.getElementById('prod-icon').textContent = activeSKU.icon;
-  document.getElementById('prod-name').textContent = activeSKU.name;
-  document.getElementById('prod-detail').textContent =
-    `${activeSKU.cat} · ${activeSKU.brand} · ST`;
+  document.getElementById('prod-icon').textContent   = activeSKU.icon || '📦';
+  document.getElementById('prod-name').textContent   = activeSKU.name;
+  document.getElementById('prod-detail').textContent = `${activeSKU.cat} · ${activeSKU.brand} · ST`;
 
-  const eType = activeSKU.e < -1 ? 'Elástico' : activeSKU.e < -0.5 ? 'Borderline' : 'Inelástico';
-  const eColor = activeSKU.e < -1 ? 'var(--red)' : activeSKU.e < -0.5 ? 'var(--orange)' : 'var(--green)';
-  document.getElementById('prod-elast').textContent = `Elasticidad: ${activeSKU.e} · ${eType}`;
-  document.getElementById('prod-elast').style.color = eColor;
+  const { lbl, color } = classifyE(activeSKU.e);
+  document.getElementById('prod-elast').textContent  = `Elasticidad: ${activeSKU.e} · ${lbl}`;
+  document.getElementById('prod-elast').style.color  = color;
 
-  document.getElementById('disc-slider').value = 0;
-  document.getElementById('disc-val').textContent = '0%';
-
+  document.getElementById('disc-slider').value       = 0;
+  document.getElementById('disc-val').textContent    = '0%';
   updateSim();
 }
 
-/* ── Vista 2: Recalcular simulación en tiempo real ──────── */
+/* ── Vista 2: Simulación en tiempo real ─────────────────── */
 function updateSim() {
   const disc   = +document.getElementById('disc-slider').value;
   const season = +document.getElementById('season-sel').value;
   const period = +document.getElementById('period-sel').value;
-
   document.getElementById('disc-val').textContent = `${disc}%`;
+  if (!activeSKU) return;
 
-  const { price: P, cost: C, sales: Q, e } = activeSKU;
-  const Pn = P * (1 - disc / 100);
-  const ratio = Pn / P;
-
-  /* fórmula: unidades_sim = Q × (precio_nuevo/precio_base)^elasticidad */
-  const Qsim = Q * Math.pow(ratio, e) * season;
-  const Rsim = Pn * Qsim * period;    // ingresos en el periodo
-  const Msim = (Pn - C) * Qsim * period;
+  const { price:P, cost:C, sales:Q, e } = activeSKU;
+  const Pn    = P * (1 - disc/100);
+  const Qsim  = Q * Math.pow(Pn/P, e) * season;
+  const Rsim  = Pn * Qsim * period;
+  const Msim  = (Pn - C) * Qsim * period;
   const Rbase = P * Q * period;
   const Mbase = (P - C) * Q * period;
+  const dS    = ((Qsim-Q)/Q)*100;
+  const dR    = ((Rsim-Rbase)/Rbase)*100;
+  const dM    = ((Msim-Mbase)/Mbase)*100;
 
-  const dSales   = ((Qsim - Q) / Q) * 100;
-  const dRev     = ((Rsim - Rbase) / Rbase) * 100;
-  const dMargin  = ((Msim - Mbase) / Mbase) * 100;
-
-  /* Precio display */
   document.getElementById('base-price').textContent = `$${P.toLocaleString('es-MX')}`;
   document.getElementById('sim-price').textContent  = `$${Math.round(Pn).toLocaleString('es-MX')}`;
   const badge = document.getElementById('price-badge');
   badge.style.display = disc > 0 ? 'inline-block' : 'none';
   badge.textContent   = `−${disc}%`;
 
-  /* KPIs */
   const fmtN = n => Math.round(n).toLocaleString('es-MX');
   const fmtM = n => {
-    const abs = Math.abs(n);
-    if (abs >= 1e6) return `$${(n/1e6).toFixed(1)}M`;
-    if (abs >= 1e3) return `$${(n/1e3).toFixed(0)}K`;
+    const a = Math.abs(n);
+    if (a>=1e6) return `$${(n/1e6).toFixed(1)}M`;
+    if (a>=1e3) return `$${(n/1e3).toFixed(0)}K`;
     return `$${Math.round(n).toLocaleString('es-MX')}`;
   };
-
   document.getElementById('kpi-ventas').textContent = fmtN(Qsim);
   document.getElementById('kpi-ing').textContent    = fmtM(Rsim);
   document.getElementById('kpi-dem').textContent    = fmtN(Qsim);
@@ -1043,172 +1343,133 @@ function updateSim() {
 
   const setDelta = (id, val) => {
     const el = document.getElementById(id);
-    if (disc === 0) { el.textContent = 'Base'; el.className = 'kd neu'; return; }
-    const sign = val > 0 ? '+' : '';
-    el.textContent = `${sign}${val.toFixed(1)}%`;
-    el.className   = `kd ${val >= 0 ? 'pos' : 'neg'}`;
+    if (disc===0){el.textContent='Base';el.className='kd neu';return;}
+    el.textContent=`${val>0?'+':''}${val.toFixed(1)}%`;
+    el.className=`kd ${val>=0?'pos':'neg'}`;
   };
-  setDelta('kpi-ventas-d', dSales);
-  setDelta('kpi-ing-d',    dRev);
-  setDelta('kpi-dem-d',    dSales);
-  setDelta('kpi-margen-d', dMargin);
+  setDelta('kpi-ventas-d',dS); setDelta('kpi-ing-d',dR);
+  setDelta('kpi-dem-d',dS);   setDelta('kpi-margen-d',dM);
 
-  /* Sparklines (6 puntos, 0% → disc%) */
-  const steps = 5;
-  const ss = [], sr = [], sm = [];
-  for (let i = 0; i <= steps; i++) {
-    const d = (disc / steps) * i;
-    const pn = P * (1 - d / 100);
-    const qn = Q * Math.pow(pn / P, e) * season;
-    ss.push(qn);
-    sr.push(pn * qn);
-    sm.push((pn - C) * qn);
+  const steps=5, ss=[],sr=[],sm=[];
+  for(let i=0;i<=steps;i++){
+    const d=(disc/steps)*i, pn=P*(1-d/100), qn=Q*Math.pow(pn/P,e)*season;
+    ss.push(qn); sr.push(pn*qn); sm.push((pn-C)*qn);
   }
-  renderSpark('sp-ventas', ss, dSales >= 0 ? '#00A86B' : '#E53935');
-  renderSpark('sp-ing',    sr, dRev   >= 0 ? '#00A86B' : '#E53935');
-  renderSpark('sp-dem',    ss, dSales >= 0 ? '#00A86B' : '#E53935');
-  renderSpark('sp-margen', sm, dMargin >= 0 ? '#00A86B' : '#E53935');
+  renderSpark('sp-ventas',ss,dS>=0?'#00A86B':'#E53935');
+  renderSpark('sp-ing',   sr,dR>=0?'#00A86B':'#E53935');
+  renderSpark('sp-dem',   ss,dS>=0?'#00A86B':'#E53935');
+  renderSpark('sp-margen',sm,dM>=0?'#00A86B':'#E53935');
 
-  /* Confianza */
-  const ae = Math.abs(e);
-  const lvl = ae > 1.3 ? 'high' : ae > 0.5 ? 'med' : 'low';
-  const lvlLabel = { high: 'Alta', med: 'Media', low: 'Baja' };
-  const lvlColor = { high: 'var(--green)', med: 'var(--orange)', low: 'var(--red)' };
-  document.getElementById('conf-lbl').textContent = lvlLabel[lvl];
-  document.getElementById('conf-lbl').style.color = lvlColor[lvl];
-  document.getElementById('conf-fill').className  = `conf-fill ${lvl}`;
+  const ae=Math.abs(e);
+  const lvl=ae>1.3?'high':ae>0.5?'med':'low';
+  document.getElementById('conf-lbl').textContent =
+    {high:'Alta',med:'Media',low:'Baja'}[lvl];
+  document.getElementById('conf-lbl').style.color  =
+    {high:'var(--green)',med:'var(--orange)',low:'var(--red)'}[lvl];
+  document.getElementById('conf-fill').className   = `conf-fill ${lvl}`;
 
-  /* Justificación Qwen (debounce 900 ms) */
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => refreshQwenV2(disc, Pn, dSales, dMargin, season), 900);
+  debounceTimer = setTimeout(()=>refreshQwenV2(disc,Pn,dS,dM,season), 900);
 }
 
-/* ── Justificación Qwen Vista 2 ─────────────────────────── */
 async function refreshQwenV2(disc, Pn, dSales, dMargin, season) {
-  const seasonNames = { '1': 'Sin evento', '1.3': 'Regreso a Clases',
-    '1.45': 'Navidad', '1.6': 'Buen Fin', '0.85': 'Verano' };
-  const sName = seasonNames[String(season)] || 'Normal';
-
+  const sNames={'1':'Sin evento','1.3':'Regreso a Clases','1.45':'Navidad','1.6':'Buen Fin','0.85':'Verano'};
+  const sName = sNames[String(season)] || 'Normal';
   setLoading('qwen-v2');
-  const prompt = `SKU: ${activeSKU.name}. Precio actual: $${activeSKU.price}. Descuento simulado: ${disc}%. Elasticidad: ${activeSKU.e}. Impacto estimado: ${dSales > 0 ? '+' : ''}${dSales.toFixed(1)}% ventas, ${dMargin.toFixed(1)}% margen. Temporada: ${sName}. En máximo 2 oraciones explica por qué esta acción de precio tiene o no sentido para OfficeMax.`;
+  const prompt = `SKU: ${activeSKU.name}. Precio actual: $${activeSKU.price}. Descuento simulado: ${disc}%. Elasticidad: ${activeSKU.e}. Impacto estimado: ${dSales>0?'+':''}${dSales.toFixed(1)}% ventas, ${dMargin.toFixed(1)}% margen. Temporada: ${sName}. En máximo 2 oraciones explica por qué esta acción de precio tiene o no sentido para OfficeMax.`;
   const r = await askQwen(prompt);
-
   if (r) { setText('qwen-v2', r); return; }
-
-  /* Fallback dinámico */
-  const fallback = disc === 0
+  const fallback = disc===0
     ? 'El precio base es el punto de referencia sin simulación. Mueve el slider para proyectar escenarios de descuento.'
-    : `Con un descuento del ${disc}%, las ventas proyectadas cambian ${dSales > 0 ? '+' : ''}${dSales.toFixed(1)}% y el margen ${dMargin.toFixed(1)}%. ${Math.abs(activeSKU.e) > 1 ? 'Al ser un SKU elástico, el mayor volumen puede compensar la reducción de precio.' : 'Al ser poco elástico, el descuento puede no generar suficiente volumen para compensar la pérdida de margen.'}`;
+    : `Con un descuento del ${disc}%, las ventas proyectadas cambian ${dSales>0?'+':''}${dSales.toFixed(1)}% y el margen ${dMargin.toFixed(1)}%. ${Math.abs(activeSKU.e)>1?'Al ser un SKU elástico, el mayor volumen puede compensar la reducción de precio.':'Al ser poco elástico, el descuento puede no generar suficiente volumen para compensar la pérdida de margen.'}`;
   setText('qwen-v2', fallback, true);
 }
 
-/* ── Tabla SKUs solución ────────────────────────────────── */
+/* ── Tabla SKUs (ficha al pie de Vista 2) ───────────────── */
 function renderSKUTable() {
   document.getElementById('sku-tbl-body').innerHTML = SKUS.map(s => {
-    const cls = s.e < -1 ? 'elastic' : s.e < -0.5 ? 'border' : 'inelastic';
-    const lbl = s.e < -1 ? 'Elástico' : s.e < -0.5 ? 'Borderline' : 'Inelástico';
+    const {cls, lbl} = classifyE(s.e);
     return `<tr>
       <td><code>${s.id}</code></td>
       <td>${s.name}</td>
       <td><span class="e-badge ${cls}">${s.e}</span></td>
       <td>${lbl}</td>
-      <td>${s.sales.toLocaleString('es-MX')} u.</td>
+      <td>${Math.round(s.sales).toLocaleString('es-MX')} u.</td>
     </tr>`;
   }).join('');
 }
 
 /* ── Exportar CSV ───────────────────────────────────────── */
 function exportCSV() {
-  const disc = +document.getElementById('disc-slider').value;
+  const disc   = +document.getElementById('disc-slider').value;
   const season = +document.getElementById('season-sel').value;
   const period = +document.getElementById('period-sel').value;
-
-  const rows = [['SKU','Nombre','Precio Base','Descuento %','Precio Nuevo',
+  const rows   = [['SKU','Nombre','Precio Base','Descuento %','Precio Nuevo',
     'Ventas Simuladas','Ingresos Simulados','Margen Simulado','Elasticidad','Temporada']];
-
   SKUS.forEach(s => {
-    const Pn = s.price * (1 - disc / 100);
-    const Qs = s.sales * Math.pow(Pn / s.price, s.e) * season;
-    rows.push([
-      s.id, s.name, s.price, `${disc}%`, Math.round(Pn),
-      Math.round(Qs * period), Math.round(Pn * Qs * period),
-      Math.round((Pn - s.cost) * Qs * period), s.e, season
-    ]);
+    const Pn = s.price*(1-disc/100);
+    const Qs = s.sales*Math.pow(Pn/s.price,s.e)*season;
+    rows.push([s.id,s.name,s.price,`${disc}%`,Math.round(Pn),
+      Math.round(Qs*period),Math.round(Pn*Qs*period),
+      Math.round((Pn-s.cost)*Qs*period),s.e,season]);
   });
-
-  const csv = rows.map(r => r.join(',')).join('\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }));
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const a   = document.createElement('a');
+  a.href    = URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'}));
   a.download = `PromoIntel_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
 }
 
 /* ── Chat ───────────────────────────────────────────────── */
-function toggleChat() {
-  document.getElementById('chat-panel').classList.toggle('open');
-}
+function toggleChat() { document.getElementById('chat-panel').classList.toggle('open'); }
 
 async function sendChat() {
   const inp = document.getElementById('chat-in');
   const msg = inp.value.trim();
   if (!msg) return;
   inp.value = '';
-
   addMsg(msg, 'user');
-  chatHistory.push({ role: 'user', content: msg });
-
-  const thinkId = addMsg('PromoIntel está analizando…', 'thinking');
-
-  const dept = document.getElementById('dept-filter').value.toUpperCase();
-  const histStr = chatHistory.map(m =>
-    `${m.role === 'user' ? 'Usuario' : 'PromoIntel'}: ${m.content}`).join('\n');
-
-  const prompt = `Eres PromoIntel AI, asistente de pricing para OfficeMax. Departamento activo: ${dept}. SKU seleccionado: ${activeSKU.name}, elasticidad: ${activeSKU.e}, precio base: $${activeSKU.price}. Datos: 5 SKUs de papel, mejor promo Desc. 15% con +32% ingresos.\nHistorial:\n${histStr}\nResponde en español, máximo 3 oraciones, orientado a acción.`;
-
+  chatHistory.push({role:'user',content:msg});
+  const thinkId = addMsg('PromoIntel está analizando…','thinking');
+  const dept    = document.getElementById('dept-filter').value.toUpperCase();
+  const histStr = chatHistory.map(m=>
+    `${m.role==='user'?'Usuario':'PromoIntel'}: ${m.content}`).join('\n');
+  const prompt  = `Eres PromoIntel AI, asistente de pricing para OfficeMax. Departamento activo: ${dept}. SKU seleccionado: ${activeSKU?.name||'N/A'}, elasticidad: ${activeSKU?.e||0}, precio base: $${activeSKU?.price||0}. ${csvLoaded?`CSV cargado con ${SKUS.length} SKUs.`:'Datos demo de 5 SKUs de papel.'}\nHistorial:\n${histStr}\nResponde en español, máximo 3 oraciones, orientado a acción.`;
   const r = await askQwen(prompt);
-
   document.getElementById(thinkId)?.remove();
-
   const reply = r || mockReply(msg);
-  addMsg(reply, 'bot');
-  chatHistory.push({ role: 'assistant', content: reply });
+  addMsg(reply,'bot');
+  chatHistory.push({role:'assistant',content:reply});
 }
 
 function mockReply(msg) {
   const m = msg.toLowerCase();
-  if (m.includes('promov') || m.includes('promo')) {
-    return `Te recomiendo promover ${activeSKU.name} con un descuento del 15%. Su elasticidad de ${activeSKU.e} garantiza que el aumento en volumen compensará la reducción de precio. Es la acción con mejor ROI proyectado en el departamento PAPEL.`;
-  }
-  if (m.includes('precio') || m.includes('descuento') || m.includes('bajar')) {
-    return `Para ${activeSKU.name}, un descuento del 10–15% genera el mejor balance entre incremento de ventas e impacto en margen según su elasticidad (${activeSKU.e}). Considera la temporada: en Regreso a Clases el multiplicador de demanda es 1.3x.`;
-  }
-  if (m.includes('margen') || m.includes('rentab')) {
-    return 'Los SKUs más inelásticos (Papel Bond 75g, Papel Reciclado 60g) son los más seguros para mantener margen. Para proteger rentabilidad, considera promociones de volumen (3x2) en los SKUs elásticos en lugar de descuentos directos.';
-  }
-  return `Basado en el análisis del departamento PAPEL, ${activeSKU.name} tiene una elasticidad de ${activeSKU.e} y ventas promedio de ${activeSKU.sales.toLocaleString('es-MX')} u. La acción de mejor impacto es un descuento del 15% en temporada de alta demanda.`;
+  if (m.includes('promov')||m.includes('promo'))
+    return `Te recomiendo promover ${activeSKU?.name||'el SKU seleccionado'} con un descuento del 15%. Su elasticidad de ${activeSKU?.e||0} garantiza que el aumento en volumen compensará la reducción de precio.`;
+  if (m.includes('precio')||m.includes('descuento')||m.includes('bajar'))
+    return `Para ${activeSKU?.name||'este SKU'}, un descuento del 10–15% genera el mejor balance entre incremento de ventas e impacto en margen (elasticidad: ${activeSKU?.e||0}).`;
+  if (m.includes('margen')||m.includes('rentab'))
+    return 'Los SKUs más inelásticos son los más seguros para mantener margen. Considera promociones de volumen (3x2) en los SKUs elásticos en lugar de descuentos directos.';
+  return `${activeSKU?.name||'El SKU'} tiene elasticidad ${activeSKU?.e||0} y ventas promedio de ${Math.round(activeSKU?.sales||0).toLocaleString('es-MX')} u. La acción de mejor impacto es un descuento del 15% en temporada de alta demanda.`;
 }
 
 function addMsg(text, type) {
   const el = document.createElement('div');
   const id = `m${Date.now()}`;
-  el.id = id;
-  el.className = `cmsg ${type}`;
-  el.innerHTML = type === 'thinking'
-    ? `<span class="spinner"></span> ${text}`
-    : text;
+  el.id = id; el.className = `cmsg ${type}`;
+  el.innerHTML = type==='thinking'?`<span class="spinner"></span> ${text}`:text;
   const box = document.getElementById('chat-msgs');
-  box.appendChild(el);
-  box.scrollTop = box.scrollHeight;
+  box.appendChild(el); box.scrollTop = box.scrollHeight;
   return id;
 }
 
-/* ── Inicialización ─────────────────────────────────────── */
+/* ── Inicialización (sin ping inicial a Ollama) ─────────── */
 async function init() {
-  await pingOllama();
+  setBadge(false);  // estado inicial: modo manual; se actualiza tras primera llamada Qwen
   renderChartPromo();
   renderChartScatter();
   renderChartTemporal();
-  loadInterps();
+  loadInterps();    // intenta Qwen; si responde → badge verde automáticamente
   updateSKU();
   renderSKUTable();
 }
