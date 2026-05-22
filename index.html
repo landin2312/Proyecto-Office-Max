@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromoIntel AI — OfficeMax Dynamic Pricing</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ── Variables de color ─────────────────────────────────── */
+:root {
+  --bg:       #F5F7FA;
+  --navy:     #1A2E5A;
+  --purple:   #4B3F8D;
+  --green:    #00A86B;
+  --red:      #E53935;
+  --orange:   #F5A623;
+  --text:     #1A1A2E;
+  --white:    #ffffff;
+  --border:   #DDE2EC;
+  --shadow:   0 2px 12px rgba(0,0,0,0.08);
+  --radius:   12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ─────────────────────────────────────────────── */
+.app-header{
+  background:var(--white);border-bottom:1px solid var(--border);
+  padding:0 24px;display:flex;align-items:center;height:64px;
+  position:sticky;top:0;z-index:100;gap:16px;
+}
+.logo{display:flex;align-items:center;gap:10px;flex:1}
+.logo-icon{font-size:28px}
+.logo-text h1{font-size:17px;font-weight:700;color:var(--navy)}
+.logo-text p{font-size:11px;color:#888}
+.nav-tabs{display:flex;gap:4px}
+.nav-tab{
+  padding:8px 18px;border-radius:8px;border:none;background:transparent;
+  cursor:pointer;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;
+  color:#666;transition:all .2s
+}
+.nav-tab.active{background:var(--navy);color:#fff}
+.nav-tab[data-view="vista2"].active{background:var(--purple)}
+.status-badge{
+  display:flex;align-items:center;gap:6px;padding:6px 12px;
+  border-radius:20px;font-size:12px;font-weight:500;white-space:nowrap
+}
+.status-badge.online{background:#e8f5e9;color:#2e7d32}
+.status-badge.offline{background:#fdecea;color:#c62828}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.status-dot.online{background:#4caf50}
+.status-dot.offline{background:#f44336}
+
+/* ── Layout principal ───────────────────────────────────── */
+.main-content{max-width:1400px;margin:0 auto;padding:24px}
+
+/* ── Vista header (bandas de color) ────────────────────── */
+.vista-header{
+  padding:20px 24px;border-radius:var(--radius);margin-bottom:20px;color:#fff
+}
+.vista-header.v1{background:linear-gradient(135deg,var(--navy) 0%,#2d4a8a 100%)}
+.vista-header.v2{background:linear-gradient(135deg,var(--purple) 0%,#6c5dd3 100%)}
+.vista-header h2{font-size:20px;font-weight:700}
+.vista-header p{font-size:13px;opacity:.8;margin-top:4px}
+
+/* ── Barra de filtros ───────────────────────────────────── */
+.filter-bar{
+  background:var(--white);border-radius:var(--radius);padding:14px 16px;
+  display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;box-shadow:var(--shadow)
+}
+.filter-group{display:flex;flex-direction:column;gap:4px}
+.filter-label{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.5px}
+.filter-bar select,.filter-bar input[type=date]{
+  padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;
+  font-family:'Inter',sans-serif;font-size:12px;color:var(--text);outline:none;cursor:pointer
+}
+.filter-bar select:focus,.filter-bar input[type=date]:focus{border-color:var(--navy)}
+
+/* ── Section cards ─────────────────────────────────────── */
+.section-card{
+  background:var(--white);border-radius:var(--radius);padding:22px;
+  margin-bottom:18px;box-shadow:var(--shadow)
+}
+.section-title{
+  font-size:15px;font-weight:700;color:var(--text);margin-bottom:18px;
+  display:flex;align-items:center;gap:8px
+}
+.section-body{
+  display:grid;grid-template-columns:180px 1fr 260px;gap:18px;align-items:start
+}
+@media(max-width:1024px){.section-body{grid-template-columns:1fr}}
+
+/* ── KPI pequeño (Vista 1) ──────────────────────────────── */
+.kpi-sm{
+  background:var(--bg);border-radius:10px;padding:16px;text-align:center;
+  display:flex;flex-direction:column;gap:4px
+}
+.kpi-sm .val{font-size:30px;font-weight:700;color:var(--green);line-height:1.1}
+.kpi-sm .lbl{font-size:11px;color:#666;line-height:1.4}
+.kpi-sm .chg{font-size:11px;font-weight:600}
+.chg.pos{color:var(--green)}.chg.neg{color:var(--red)}
+
+/* ── Cuadro de interpretación ───────────────────────────── */
+.interp-box{background:#EFF6FF;border-radius:10px;padding:14px;border-left:3px solid #3B82F6}
+.interp-hdr{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+  color:#1D4ED8;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.interp-txt{font-size:12px;color:#1e40af;line-height:1.6}
+
+/* ── Insight clave ──────────────────────────────────────── */
+.insight-box{
+  background:#FFFBEB;border:1px solid #FDE68A;border-radius:var(--radius);
+  padding:18px 22px;display:flex;align-items:flex-start;gap:12px;margin-bottom:20px
+}
+.insight-icon{font-size:22px;flex-shrink:0}
+.insight-hdr{font-size:12px;font-weight:700;color:#92400e;margin-bottom:4px}
+.insight-txt{font-size:13px;color:#78350f;line-height:1.6;font-style:italic}
+
+/* ── Spinner / estados LLM ──────────────────────────────── */
+.spinner{
+  display:inline-block;width:14px;height:14px;border:2px solid #ccc;
+  border-top-color:#3B82F6;border-radius:50%;animation:spin .7s linear infinite
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-line{display:flex;align-items:center;gap:8px;font-size:12px;color:#888;font-style:italic}
+.fade-in{animation:fadeIn .35s ease-in}
+@keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+.offline-badge{
+  display:inline-flex;align-items:center;gap:3px;font-size:10px;
+  background:#fff3cd;color:#856404;padding:2px 6px;border-radius:4px;font-weight:600
+}
+
+/* ── Tooltip ────────────────────────────────────────────── */
+.tip-wrap{position:relative;display:inline-flex;align-items:center;margin-left:4px}
+.tip-icon{
+  width:15px;height:15px;background:#cbd5e1;border-radius:50%;font-size:9px;
+  display:inline-flex;align-items:center;justify-content:center;cursor:help;
+  color:#fff;font-weight:700;flex-shrink:0
+}
+.tip-box{
+  position:absolute;bottom:120%;left:50%;transform:translateX(-50%);
+  background:#1a1a2e;color:#fff;font-size:11px;padding:8px 10px;border-radius:8px;
+  white-space:normal;width:200px;z-index:999;opacity:0;pointer-events:none;
+  transition:opacity .2s;line-height:1.4
+}
+.tip-wrap:hover .tip-box{opacity:1}
+
+/* ══════════════════════════════════════════════════════════
+   VISTA 2
+══════════════════════════════════════════════════════════ */
+.v2-grid{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start}
+@media(max-width:1024px){.v2-grid{grid-template-columns:1fr}}
+
+/* Columna izquierda */
+.ctrl-col{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--white);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.card h3{font-size:13px;font-weight:700;color:var(--purple);margin-bottom:14px}
+.card label{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;
+  letter-spacing:.5px;display:block;margin-bottom:6px}
+.card select,.card input[type=text]{
+  width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;
+  font-family:'Inter',sans-serif;font-size:13px;outline:none;background:#fff
+}
+.card select:focus,.card input[type=text]:focus{border-color:var(--purple)}
+
+/* Ficha producto */
+.prod-card{
+  display:flex;align-items:center;gap:10px;padding:10px;
+  background:var(--bg);border-radius:10px;margin-top:10px
+}
+.prod-icon{
+  font-size:30px;width:50px;height:50px;display:flex;align-items:center;
+  justify-content:center;background:#fff;border-radius:8px;border:1px solid var(--border);flex-shrink:0
+}
+.prod-name{font-size:13px;font-weight:600;color:var(--text)}
+.prod-detail{font-size:11px;color:#888;margin-top:2px}
+.prod-elast{font-size:11px;font-weight:700;margin-top:2px}
+
+/* Precios */
+.price-row{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:8px}
+.price-block{text-align:center}
+.price-block .plbl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#888;font-weight:600}
+.price-block .pval{font-size:26px;font-weight:700;color:var(--text)}
+.price-block.rec .plbl{color:var(--green)}
+.price-block.rec .pval{color:var(--green);font-size:32px}
+.price-arrow{font-size:18px;color:#ccc}
+.price-badge{
+  font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;
+  background:#fdecea;color:var(--red);display:none
+}
+
+/* Slider */
+.ctrl-group{margin-bottom:14px}
+.ctrl-group label{font-size:11px;font-weight:700;color:#666;text-transform:uppercase;
+  letter-spacing:.5px;display:flex;align-items:center;margin-bottom:7px}
+.slider-row{display:flex;align-items:center;gap:10px}
+.disc-slider{
+  flex:1;-webkit-appearance:none;height:6px;border-radius:3px;outline:none;
+  background:linear-gradient(to right,var(--green) 0%,var(--orange) 55%,var(--red) 100%)
+}
+.disc-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+  background:var(--navy);cursor:pointer;border:3px solid #fff;
+  box-shadow:0 2px 6px rgba(0,0,0,.25)
+}
+.disc-val{font-size:18px;font-weight:700;color:var(--navy);min-width:44px;text-align:center}
+
+/* ── KPI 2×2 Vista 2 ────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kpi-v2{background:var(--white);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.kpi-v2 .ki{font-size:18px;margin-bottom:4px}
+.kpi-v2 .kt{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.5px;
+  font-weight:600;display:flex;align-items:center}
+.kpi-v2 .kv{font-size:26px;font-weight:700;margin:6px 0 2px}
+.kpi-v2 .kd{font-size:12px;font-weight:600}
+.kd.pos{color:var(--green)}.kd.neg{color:var(--red)}.kd.neu{color:#888}
+.spark-wrap{height:34px;margin-top:8px}
+
+/* Confianza */
+.conf-card{background:var(--white);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow)}
+.conf-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px}
+.conf-row span:first-child{color:#666;display:flex;align-items:center}
+.conf-track{height:8px;background:#eee;border-radius:4px;overflow:hidden}
+.conf-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.conf-fill.high{background:var(--green);width:85%}
+.conf-fill.med{background:var(--orange);width:60%}
+.conf-fill.low{background:var(--red);width:30%}
+
+/* Qwen V2 */
+.qwen-box{background:#F8F7FF;border-radius:10px;padding:14px;border-left:3px solid var(--purple)}
+.qwen-hdr{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+  color:var(--purple);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.qwen-txt{font-size:12px;color:#444;line-height:1.6;font-style:italic}
+
+/* Export */
+.export-btn{
+  background:var(--navy);color:#fff;border:none;padding:12px;border-radius:8px;
+  font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  transition:opacity .2s
+}
+.export-btn:hover{opacity:.85}
+
+/* Solución */
+.solution-card{
+  background:linear-gradient(135deg,var(--purple) 0%,#6c5dd3 100%);
+  border-radius:var(--radius);padding:22px;color:#fff;margin-top:18px
+}
+.solution-card h3{font-size:15px;font-weight:700;margin-bottom:8px}
+.solution-card p{font-size:12px;opacity:.85;margin-bottom:14px;line-height:1.6}
+.sku-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.sku-tbl th{text-align:left;padding:6px 10px;background:rgba(255,255,255,.15);font-weight:600}
+.sku-tbl td{padding:6px 10px;border-top:1px solid rgba(255,255,255,.1)}
+.e-badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700}
+.e-badge.elastic{background:rgba(229,57,53,.35)}
+.e-badge.border{background:rgba(245,166,35,.35)}
+.e-badge.inelastic{background:rgba(0,168,107,.35)}
+
+/* ── Chat FAB ───────────────────────────────────────────── */
+.chat-fab{
+  position:fixed;bottom:24px;right:24px;background:var(--purple);color:#fff;
+  border:none;padding:13px 20px;border-radius:30px;font-family:'Inter',sans-serif;
+  font-size:13px;font-weight:600;cursor:pointer;
+  box-shadow:0 4px 20px rgba(75,63,141,.45);z-index:200;
+  display:flex;align-items:center;gap:8px;transition:transform .2s,box-shadow .2s
+}
+.chat-fab:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(75,63,141,.55)}
+
+/* ── Chat Panel ─────────────────────────────────────────── */
+.chat-panel{
+  position:fixed;right:-400px;top:0;bottom:0;width:380px;
+  background:#fff;border-left:1px solid var(--border);
+  box-shadow:-4px 0 24px rgba(0,0,0,.1);display:flex;flex-direction:column;
+  z-index:300;transition:right .3s ease
+}
+.chat-panel.open{right:0}
+.chat-ph{
+  background:var(--purple);color:#fff;padding:14px 18px;
+  display:flex;justify-content:space-between;align-items:center
+}
+.chat-ph h3{font-size:14px;font-weight:700}
+.chat-ph p{font-size:11px;opacity:.7}
+.chat-close{
+  background:rgba(255,255,255,.2);border:none;color:#fff;
+  width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center
+}
+.chat-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.cmsg{max-width:86%;padding:9px 13px;border-radius:12px;font-size:12px;line-height:1.5}
+.cmsg.user{align-self:flex-end;background:var(--purple);color:#fff;border-bottom-right-radius:3px}
+.cmsg.bot{align-self:flex-start;background:#f0f0f5;color:var(--text);border-bottom-left-radius:3px}
+.cmsg.thinking{align-self:flex-start;background:#f0f0f5;display:flex;align-items:center;gap:8px;color:#888}
+.chat-input-row{padding:14px;border-top:1px solid var(--border);display:flex;gap:8px}
+.chat-input-row input{
+  flex:1;padding:9px 13px;border:1px solid var(--border);border-radius:24px;
+  font-family:'Inter',sans-serif;font-size:12px;outline:none
+}
+.chat-input-row input:focus{border-color:var(--purple)}
+.chat-send{
+  background:var(--purple);color:#fff;border:none;padding:9px 16px;
+  border-radius:24px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media(max-width:768px){
+  .main-content{padding:12px}
+  .app-header{flex-wrap:wrap;height:auto;padding:10px 14px;gap:8px}
+  .kpi-grid{grid-template-columns:1fr}
+  .chat-panel{width:100%;right:-100%}
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════ HEADER ════════════════════════ -->
+<header class="app-header">
+  <div class="logo">
+    <span class="logo-icon">📊</span>
+    <div class="logo-text">
+      <h1>PromoIntel AI</h1>
+      <p>Office Max Intelligence</p>
+    </div>
+  </div>
+
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-view="vista1" onclick="switchView('vista1')">
+      📈 ¿Qué ha pasado?
+    </button>
+    <button class="nav-tab" data-view="vista2" onclick="switchView('vista2')">
+      🔮 ¿Qué pasará?
+    </button>
+  </nav>
+
+  <div id="status-badge" class="status-badge offline">
+    <span class="status-dot offline" id="status-dot"></span>
+    <span id="status-text">🔴 Modo offline</span>
+  </div>
+</header>
+
+<!-- ════════════════════════ MAIN ══════════════════════════ -->
+<div class="main-content">
+
+<!-- ══════════════ VISTA 1 ══════════════════════════════════ -->
+<div id="vista1">
+
+  <div class="vista-header v1">
+    <h2>📈 Dashboard Descriptivo</h2>
+    <p>Analiza el impacto histórico de promociones, sensibilidad de precios por SKU y comportamiento de ventas</p>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">Departamento</span>
+      <select id="dept-filter" onchange="applyFilters()">
+        <option value="todos">Todos</option>
+        <option value="papel" selected>Papel</option>
+        <option value="archivo">Archivo y Accesorios</option>
+        <option value="carpetas">Carpetas</option>
+        <option value="suministros">Suministros de Oficina</option>
+        <option value="escolar">Artículos Escolares</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Categoría</span>
+      <select id="cat-filter" onchange="applyFilters()">
+        <option value="todos">Todas</option>
+        <option value="bond">Papel Bond</option>
+        <option value="eco">Papel Ecológico</option>
+        <option value="reciclado">Papel Reciclado</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">SKU</span>
+      <select id="sku-filter" onchange="applyFilters()">
+        <option value="todos">Todos</option>
+        <option value="50077229">50077229 — Papel Copia OMX</option>
+        <option value="50106204">50106204 — Marathon Resma</option>
+        <option value="50084493">50084493 — Papel Xerox Eco</option>
+        <option value="50091122">50091122 — Papel Bond 75g</option>
+        <option value="50033841">50033841 — Papel Reciclado 60g</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Tipo de Promoción</span>
+      <select id="promo-filter" onchange="applyFilters()">
+        <option value="todos">Todas</option>
+        <option value="desc15">Desc. 15%</option>
+        <option value="desc20">Desc. 20%</option>
+        <option value="3x2">3x2</option>
+        <option value="2x1">2x1</option>
+        <option value="otros">Otros</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Fecha inicio</span>
+      <input type="date" id="date-from" value="2024-01-01" onchange="applyFilters()">
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Fecha fin</span>
+      <input type="date" id="date-to" value="2025-12-31" onchange="applyFilters()">
+    </div>
+  </div>
+
+  <!-- Sección 1: Ingresos por tipo de promoción -->
+  <div class="section-card">
+    <div class="section-title">💰 ¿Qué promociones generan más ingresos?</div>
+    <div class="section-body">
+      <div class="kpi-sm">
+        <div class="val" id="s1-val">+32%</div>
+        <div class="lbl">Incremento de ingresos con la mejor promoción</div>
+        <div class="chg pos">↑ vs sin promoción</div>
+      </div>
+      <canvas id="chart-promo" style="max-height:220px"></canvas>
+      <div class="interp-box">
+        <div class="interp-hdr">💡 Interpretación</div>
+        <div class="interp-txt" id="interp-1">
+          <span class="loading-line"><span class="spinner"></span> PromoIntel está analizando…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección 2: Scatter elasticidad -->
+  <div class="section-card">
+    <div class="section-title">
+      📉 ¿Qué SKUs son más sensibles al precio?
+      <div class="tip-wrap"><span class="tip-icon">?</span>
+        <div class="tip-box">Elasticidad &lt; −1: alta sensibilidad (elástico). Entre −1 y −0.5: moderada. Cercano a 0: poca sensibilidad (inelástico).</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="kpi-sm">
+        <div class="val" id="s2-val">60%</div>
+        <div class="lbl">SKUs altamente elásticos al precio</div>
+        <div class="chg neg">↑ sensibles a cambios</div>
+      </div>
+      <canvas id="chart-scatter" style="max-height:220px"></canvas>
+      <div class="interp-box">
+        <div class="interp-hdr">💡 Interpretación</div>
+        <div class="interp-txt" id="interp-2">
+          <span class="loading-line"><span class="spinner"></span> PromoIntel está analizando…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección 3: Temporal -->
+  <div class="section-card">
+    <div class="section-title">📊 ¿Qué promociones realmente impulsan ventas?</div>
+    <div class="section-body">
+      <div class="kpi-sm">
+        <div class="val" id="s3-val">+27%</div>
+        <div class="lbl">Incremento promedio en ventas durante promoción</div>
+        <div class="chg pos">↑ pico durante promo</div>
+      </div>
+      <canvas id="chart-temporal" style="max-height:220px"></canvas>
+      <div class="interp-box">
+        <div class="interp-hdr">💡 Interpretación</div>
+        <div class="interp-txt" id="interp-3">
+          <span class="loading-line"><span class="spinner"></span> PromoIntel está analizando…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Insight clave -->
+  <div class="insight-box">
+    <span class="insight-icon">⭐</span>
+    <div>
+      <div class="insight-hdr">Insight Clave</div>
+      <div class="insight-txt" id="key-insight">
+        <span class="loading-line"><span class="spinner"></span> Generando insight…</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /vista1 -->
+
+
+<!-- ══════════════ VISTA 2 ══════════════════════════════════ -->
+<div id="vista2" style="display:none">
+
+  <div class="vista-header v2">
+    <h2>🔮 Motor Predictivo de Precios</h2>
+    <p>Simula escenarios de descuento y proyecta el impacto en ventas, ingresos y margen en tiempo real</p>
+  </div>
+
+  <div class="v2-grid">
+
+    <!-- COLUMNA IZQUIERDA: controles -->
+    <div class="ctrl-col">
+
+      <!-- Selector SKU -->
+      <div class="card">
+        <label>Selecciona un SKU</label>
+        <select id="v2-sku" onchange="updateSKU()">
+          <option value="50077229">50077229 — Papel Copia OMX 92 75G</option>
+          <option value="50106204">50106204 — Marathon Resma 500 Hojas</option>
+          <option value="50084493">50084493 — Papel Xerox Ecologico TC</option>
+          <option value="50091122">50091122 — Papel Bond 75g Resma</option>
+          <option value="50033841">50033841 — Papel Reciclado 60g</option>
+        </select>
+        <div class="prod-card">
+          <div class="prod-icon" id="prod-icon">🗒️</div>
+          <div>
+            <div class="prod-name" id="prod-name">Papel Copia OMX 92 75G</div>
+            <div class="prod-detail" id="prod-detail">Papel Bond · OfficeMax · ST</div>
+            <div class="prod-elast" id="prod-elast" style="color:var(--red)">Elasticidad: −1.85 · Elástico</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Precio actual → simulado -->
+      <div class="card" style="text-align:center">
+        <div class="price-row">
+          <div class="price-block">
+            <div class="plbl">Precio actual</div>
+            <div class="pval" id="base-price">$1,120</div>
+          </div>
+          <span class="price-arrow">→</span>
+          <div class="price-block rec">
+            <div class="plbl">Precio simulado</div>
+            <div class="pval" id="sim-price">$1,120</div>
+          </div>
+        </div>
+        <span class="price-badge" id="price-badge"></span>
+      </div>
+
+      <!-- Controles de simulación -->
+      <div class="card">
+        <h3>⚙️ Controles de Simulación</h3>
+
+        <div class="ctrl-group">
+          <label>
+            Descuento aplicado
+            <div class="tip-wrap"><span class="tip-icon">?</span>
+              <div class="tip-box">% de reducción sobre precio base. Recalcula ventas, ingresos y margen vía elasticidad.</div>
+            </div>
+          </label>
+          <div class="slider-row">
+            <input type="range" id="disc-slider" class="disc-slider" min="0" max="40" step="1" value="0" oninput="updateSim()">
+            <div class="disc-val" id="disc-val">0%</div>
+          </div>
+        </div>
+
+        <div class="ctrl-group">
+          <label>Temporada / Evento</label>
+          <select id="season-sel" onchange="updateSim()">
+            <option value="1.00">Sin evento especial</option>
+            <option value="1.30">Regreso a Clases</option>
+            <option value="1.45">Navidad</option>
+            <option value="1.60">Buen Fin</option>
+            <option value="0.85">Verano</option>
+          </select>
+        </div>
+
+        <div class="ctrl-group">
+          <label>Tipo de promoción</label>
+          <select id="promo-type-sel" onchange="updateSim()">
+            <option value="desc">Descuento %</option>
+            <option value="3x2">3x2</option>
+            <option value="2x1">2x1</option>
+            <option value="2do50">2do al 50%</option>
+          </select>
+        </div>
+
+        <div class="ctrl-group" style="margin-bottom:0">
+          <label>
+            Periodo de análisis
+            <div class="tip-wrap"><span class="tip-icon">?</span>
+              <div class="tip-box">Semanas sobre las que se proyectan los resultados de la simulación.</div>
+            </div>
+          </label>
+          <select id="period-sel" onchange="updateSim()">
+            <option value="4">4 semanas</option>
+            <option value="8" selected>8 semanas</option>
+            <option value="12">12 semanas</option>
+          </select>
+        </div>
+      </div>
+
+    </div><!-- /ctrl-col -->
+
+
+    <!-- COLUMNA DERECHA: resultados -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+
+      <!-- 4 KPIs 2×2 -->
+      <div class="kpi-grid">
+
+        <div class="kpi-v2">
+          <div class="ki">🛒</div>
+          <div class="kt">Ventas esperadas</div>
+          <div class="kv" id="kpi-ventas">18,300</div>
+          <div class="kd neu" id="kpi-ventas-d">Base</div>
+          <div class="spark-wrap"><canvas id="sp-ventas"></canvas></div>
+        </div>
+
+        <div class="kpi-v2">
+          <div class="ki">💲</div>
+          <div class="kt">Ingresos esperados</div>
+          <div class="kv" id="kpi-ing">$20.5M</div>
+          <div class="kd neu" id="kpi-ing-d">Base</div>
+          <div class="spark-wrap"><canvas id="sp-ing"></canvas></div>
+        </div>
+
+        <div class="kpi-v2">
+          <div class="ki">👥</div>
+          <div class="kt">Demanda esperada</div>
+          <div class="kv" id="kpi-dem">18,300</div>
+          <div class="kd neu" id="kpi-dem-d">Base</div>
+          <div class="spark-wrap"><canvas id="sp-dem"></canvas></div>
+        </div>
+
+        <div class="kpi-v2">
+          <div class="ki">📊</div>
+          <div class="kt">
+            Margen esperado
+            <div class="tip-wrap"><span class="tip-icon">?</span>
+              <div class="tip-box">Margen = (Precio − Costo) × Unidades. Rentabilidad total del periodo simulado.</div>
+            </div>
+          </div>
+          <div class="kv" id="kpi-margen">$6.2M</div>
+          <div class="kd neu" id="kpi-margen-d">Base</div>
+          <div class="spark-wrap"><canvas id="sp-margen"></canvas></div>
+        </div>
+
+      </div><!-- /kpi-grid -->
+
+      <!-- Confianza del modelo -->
+      <div class="conf-card">
+        <div class="conf-row">
+          <span>
+            Confianza del modelo
+            <div class="tip-wrap"><span class="tip-icon">?</span>
+              <div class="tip-box">Estimación basada en R² y cantidad de observaciones usadas para estimar la elasticidad.</div>
+            </div>
+          </span>
+          <span id="conf-lbl" style="font-weight:700;color:var(--green)">Alta</span>
+        </div>
+        <div class="conf-track"><div class="conf-fill high" id="conf-fill"></div></div>
+      </div>
+
+      <!-- Justificación Qwen -->
+      <div class="qwen-box">
+        <div class="qwen-hdr">🤖 Análisis de PromoIntel AI</div>
+        <div class="qwen-txt" id="qwen-v2">
+          <span class="loading-line"><span class="spinner"></span> PromoIntel está analizando…</span>
+        </div>
+      </div>
+
+      <!-- Exportar -->
+      <button class="export-btn" onclick="exportCSV()">⬇️ Exportar resultados a CSV</button>
+
+    </div><!-- /results col -->
+  </div><!-- /v2-grid -->
+
+  <!-- Ficha de la solución -->
+  <div class="solution-card">
+    <h3>🎯 PromoIntel AI — Motor de Pricing Inteligente para OfficeMax</h3>
+    <p>Modelos de elasticidad log-log estimados por SKU con regresión sobre historial 2024–2026.
+      Permite simular impacto de cambios de precio en tiempo real y optimizar estrategias de descuento por temporada, categoría y canal.</p>
+    <table class="sku-tbl">
+      <thead>
+        <tr><th>SKU</th><th>Nombre</th><th>Elasticidad</th><th>Clasificación</th><th>Ventas prom.</th></tr>
+      </thead>
+      <tbody id="sku-tbl-body"></tbody>
+    </table>
+  </div>
+
+</div><!-- /vista2 -->
+</div><!-- /main-content -->
+
+<!-- ══════════════ CHAT FAB ═════════════════════════════════ -->
+<button class="chat-fab" onclick="toggleChat()">💬 Pregúntale a PromoIntel</button>
+
+<!-- ══════════════ CHAT PANEL ══════════════════════════════ -->
+<div id="chat-panel" class="chat-panel">
+  <div class="chat-ph">
+    <div><h3>PromoIntel AI 🤖</h3><p>Asistente de pricing OfficeMax</p></div>
+    <button class="chat-close" onclick="toggleChat()">✕</button>
+  </div>
+  <div class="chat-msgs" id="chat-msgs">
+    <div class="cmsg bot">¡Hola! Soy PromoIntel AI. Puedo ayudarte con análisis de precios, elasticidades y estrategias de promoción. ¿En qué te puedo ayudar?</div>
+  </div>
+  <div class="chat-input-row">
+    <input type="text" id="chat-in" placeholder="Ej: ¿qué SKU debería promover esta semana?" onkeydown="if(event.key==='Enter')sendChat()">
+    <button class="chat-send" onclick="sendChat()">Enviar</button>
+  </div>
+</div>
+
+<!-- ════════════════════════ JS ════════════════════════════ -->
+<script>
+/* ── Datos mock (modo demo sin backend) ─────────────────── */
+const SKUS = [
+  { id:'50077229', name:'Papel Copia OMX 92 75G',  e:-1.85, sales:18300, price:1120, cost:780,  cat:'Papel Bond',      brand:'OfficeMax', icon:'🗒️' },
+  { id:'50106204', name:'Marathon Resma 500 Hojas', e:-1.12, sales:12400, price:890,  cost:620,  cat:'Papel Bond',      brand:'Marathon',  icon:'📄' },
+  { id:'50084493', name:'Papel Xerox Ecologico TC', e:-0.74, sales:8700,  price:1050, cost:730,  cat:'Papel Ecológico', brand:'Xerox',     icon:'♻️' },
+  { id:'50091122', name:'Papel Bond 75g Resma',     e:-0.45, sales:6200,  price:750,  cost:520,  cat:'Papel Bond',      brand:'Generic',   icon:'📋' },
+  { id:'50033841', name:'Papel Reciclado 60g',      e:0.12,  sales:3100,  price:680,  cost:480,  cat:'Papel Reciclado', brand:'EcoOffice', icon:'🌿' }
+];
+
+const PROMO_MOCK = {
+  labels: ['Desc. 15%','Desc. 20%','3x2','2x1','Otros'],
+  data:   [32, 28, 22, 18, 8]
+};
+
+const TEMPORAL_MOCK = {
+  labels: ['-4 sem','-3 sem','-2 sem','-1 sem','Inicio','+1 sem','+2 sem','+3 sem','+4 sem'],
+  data:   [100, 102, 98, 101, 127, 134, 119, 112, 104]
+};
+
+const MOCK_TEXTS = {
+  i1: 'Los descuentos del 15% y 20% generan el mayor incremento de ingresos en PAPEL. Se recomienda priorizarlos en temporadas de alta demanda como Regreso a Clases.',
+  i2: 'El SKU 50077229 (Papel Copia OMX) es el más sensible al precio con elasticidad −1.85. Un ajuste de 10% en precio puede generar hasta un 18% de variación en ventas.',
+  i3: 'Las ventas suben 27% en la semana de inicio de promoción y regresan gradualmente al nivel base en 2–3 semanas. El efecto post-promo es moderado y predecible.',
+  insight: 'En PAPEL, los descuentos del 15–20% generan el mejor balance entre incremento de volumen e ingresos sin erosionar significativamente el margen operativo.'
+};
+
+/* ── Estado global ──────────────────────────────────────── */
+let ollamaOk = false;
+let activeSKU = SKUS[0];
+let chatHistory = [];
+let charts = {};
+let debounceTimer = null;
+
+/* ── Comunicación con Qwen2 vía Ollama ──────────────────── */
+async function askQwen(prompt, timeout = 15000) {
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), timeout);
+    const res = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'qwen2', prompt, stream: false }),
+      signal: ctrl.signal
+    });
+    clearTimeout(tid);
+    const d = await res.json();
+    return d.response || null;
+  } catch { return null; }
+}
+
+/* ── Ping inicial a Ollama ──────────────────────────────── */
+async function pingOllama() {
+  try {
+    const r = await fetch('http://localhost:11434/api/tags', { method: 'GET' });
+    if (r.ok) { ollamaOk = true; setBadge(true); return; }
+  } catch {}
+  ollamaOk = false; setBadge(false);
+}
+
+function setBadge(online) {
+  const b = document.getElementById('status-badge');
+  const d = document.getElementById('status-dot');
+  const t = document.getElementById('status-text');
+  b.className = 'status-badge ' + (online ? 'online' : 'offline');
+  d.className = 'status-dot ' + (online ? 'online' : 'offline');
+  t.textContent = online ? '🟢 Qwen2 conectado' : '🔴 Modo offline';
+}
+
+/* ── Cambio de vista ────────────────────────────────────── */
+function switchView(v) {
+  document.getElementById('vista1').style.display = v === 'vista1' ? 'block' : 'none';
+  document.getElementById('vista2').style.display = v === 'vista2' ? 'block' : 'none';
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`[data-view="${v}"]`).classList.add('active');
+}
+
+/* ── Helpers de UI ──────────────────────────────────────── */
+function setLoading(id) {
+  document.getElementById(id).innerHTML =
+    '<span class="loading-line"><span class="spinner"></span> PromoIntel está analizando…</span>';
+}
+function setText(id, txt, offline = false) {
+  document.getElementById(id).innerHTML =
+    `<span class="fade-in">${txt}</span>` +
+    (offline ? ' <span class="offline-badge">⚠️ Modo offline</span>' : '');
+}
+
+/* ── Cargar interpretaciones (Vista 1) ──────────────────── */
+async function loadInterps() {
+  const dept = document.getElementById('dept-filter').value.toUpperCase();
+  const promoSel = document.getElementById('promo-filter').value;
+  const promoLabel = promoSel === 'todos' ? 'Desc. 15%' : promoSel;
+
+  ['interp-1','interp-2','interp-3','key-insight'].forEach(setLoading);
+
+  const p1 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el tipo de promoción ${promoLabel} generó un incremento de 32% en ingresos vs escenario sin promoción. El SKU más elástico es Papel Copia OMX 92 con elasticidad -1.85. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
+  const r1 = await askQwen(p1);
+  setText('interp-1', r1 || MOCK_TEXTS.i1, !r1);
+
+  const p2 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el 60% de los SKUs son altamente elásticos al precio. El SKU más sensible es Papel Copia OMX 92 con elasticidad -1.85 y ventas promedio de 18,300 unidades. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
+  const r2 = await askQwen(p2);
+  setText('interp-2', r2 || MOCK_TEXTS.i2, !r2);
+
+  const p3 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, las ventas aumentan 27% durante las promociones y regresan a niveles base en 2-3 semanas. El tipo de promoción más efectivo es ${promoLabel}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
+  const r3 = await askQwen(p3);
+  setText('interp-3', r3 || MOCK_TEXTS.i3, !r3);
+
+  const p4 = `Dado el análisis del departamento ${dept} (mejor promoción: ${promoLabel}, elasticidad promedio: -1.03, incremento ventas: 27%), genera UN insight accionable de negocio en una sola oración, en español.`;
+  const r4 = await askQwen(p4);
+  setText('key-insight', r4 || MOCK_TEXTS.insight, !r4);
+}
+
+/* ── Filtros Vista 1 ────────────────────────────────────── */
+function applyFilters() {
+  renderChartPromo();
+  renderChartScatter();
+  renderChartTemporal();
+  loadInterps();
+}
+
+/* ── Gráfica 1: Barras de ingresos por promo ────────────── */
+function renderChartPromo() {
+  const ctx = document.getElementById('chart-promo').getContext('2d');
+  if (charts.promo) charts.promo.destroy();
+  charts.promo = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: PROMO_MOCK.labels,
+      datasets: [{
+        data: PROMO_MOCK.data,
+        backgroundColor: ['#1A2E5A','#2d4a8a','#4a74cc','#7aa3e8','#b8cff5'],
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => `+${c.raw}% vs sin promoción` } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => `+${v}%` }, grid: { color: '#f0f0f0' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+/* ── Gráfica 2: Scatter elasticidad ─────────────────────── */
+function renderChartScatter() {
+  const ctx = document.getElementById('chart-scatter').getContext('2d');
+  if (charts.scatter) charts.scatter.destroy();
+
+  const pts = SKUS.map(s => ({ x: s.sales, y: s.e, label: s.name }));
+  const clrs = SKUS.map(s =>
+    s.e < -1 ? '#E53935' : s.e < -0.5 ? '#F5A623' : '#00A86B');
+
+  charts.scatter = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: 'SKUs',
+          data: pts,
+          backgroundColor: clrs,
+          pointRadius: 9,
+          pointHoverRadius: 12
+        },
+        {
+          type: 'line',
+          label: 'β = −1 (umbral)',
+          data: [{ x: 0, y: -1 }, { x: 22000, y: -1 }],
+          borderColor: '#999',
+          borderDash: [5, 4],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => c.datasetIndex === 0
+              ? [`📦 ${c.raw.label}`, `Ventas: ${c.raw.x.toLocaleString('es-MX')}`, `Elasticidad: ${c.raw.y}`]
+              : 'Umbral elástico (β=−1)'
+          }
+        }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Ventas prom. mensuales', font: { size: 11 } },
+             ticks: { callback: v => v.toLocaleString('es-MX') }, grid: { color: '#f0f0f0' } },
+        y: { title: { display: true, text: 'Elasticidad (β)', font: { size: 11 } },
+             grid: { color: '#f0f0f0' } }
+      }
+    }
+  });
+}
+
+/* ── Gráfica 3: Línea temporal ──────────────────────────── */
+function renderChartTemporal() {
+  const ctx = document.getElementById('chart-temporal').getContext('2d');
+  if (charts.temporal) charts.temporal.destroy();
+
+  charts.temporal = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: TEMPORAL_MOCK.labels,
+      datasets: [{
+        label: 'Índice de ventas',
+        data: TEMPORAL_MOCK.data,
+        borderColor: '#1A2E5A',
+        backgroundColor: 'rgba(26,46,90,0.07)',
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 5,
+        pointBackgroundColor: '#1A2E5A'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => `Índice: ${c.raw} (base 100)` } }
+      },
+      scales: {
+        y: { min: 85, ticks: { callback: v => v }, grid: { color: '#f0f0f0' } },
+        x: { grid: { color: '#f0f0f0' } }
+      }
+    },
+    plugins: [{
+      id: 'promoLine',
+      afterDraw(chart) {
+        const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+        const xPos = x.getPixelForIndex(4);
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(xPos, top);
+        ctx.lineTo(xPos, bottom);
+        ctx.strokeStyle = '#E53935';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#E53935';
+        ctx.font = '11px Inter,sans-serif';
+        ctx.fillText('Inicio promo', xPos + 5, top + 14);
+        ctx.restore();
+      }
+    }]
+  });
+}
+
+/* ── Sparklines Vista 2 ─────────────────────────────────── */
+function renderSpark(id, data, color) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el._spChart) el._spChart.destroy();
+  el._spChart = new Chart(el.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: data.map((_,i) => i),
+      datasets: [{ data, borderColor: color, borderWidth: 2, fill: false,
+                   tension: 0.4, pointRadius: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false } },
+      animation: { duration: 250 }
+    }
+  });
+}
+
+/* ── Vista 2: Actualizar producto ───────────────────────── */
+function updateSKU() {
+  const id = document.getElementById('v2-sku').value;
+  activeSKU = SKUS.find(s => s.id === id) || SKUS[0];
+
+  document.getElementById('prod-icon').textContent = activeSKU.icon;
+  document.getElementById('prod-name').textContent = activeSKU.name;
+  document.getElementById('prod-detail').textContent =
+    `${activeSKU.cat} · ${activeSKU.brand} · ST`;
+
+  const eType = activeSKU.e < -1 ? 'Elástico' : activeSKU.e < -0.5 ? 'Borderline' : 'Inelástico';
+  const eColor = activeSKU.e < -1 ? 'var(--red)' : activeSKU.e < -0.5 ? 'var(--orange)' : 'var(--green)';
+  document.getElementById('prod-elast').textContent = `Elasticidad: ${activeSKU.e} · ${eType}`;
+  document.getElementById('prod-elast').style.color = eColor;
+
+  document.getElementById('disc-slider').value = 0;
+  document.getElementById('disc-val').textContent = '0%';
+
+  updateSim();
+}
+
+/* ── Vista 2: Recalcular simulación en tiempo real ──────── */
+function updateSim() {
+  const disc   = +document.getElementById('disc-slider').value;
+  const season = +document.getElementById('season-sel').value;
+  const period = +document.getElementById('period-sel').value;
+
+  document.getElementById('disc-val').textContent = `${disc}%`;
+
+  const { price: P, cost: C, sales: Q, e } = activeSKU;
+  const Pn = P * (1 - disc / 100);
+  const ratio = Pn / P;
+
+  /* fórmula: unidades_sim = Q × (precio_nuevo/precio_base)^elasticidad */
+  const Qsim = Q * Math.pow(ratio, e) * season;
+  const Rsim = Pn * Qsim * period;    // ingresos en el periodo
+  const Msim = (Pn - C) * Qsim * period;
+  const Rbase = P * Q * period;
+  const Mbase = (P - C) * Q * period;
+
+  const dSales   = ((Qsim - Q) / Q) * 100;
+  const dRev     = ((Rsim - Rbase) / Rbase) * 100;
+  const dMargin  = ((Msim - Mbase) / Mbase) * 100;
+
+  /* Precio display */
+  document.getElementById('base-price').textContent = `$${P.toLocaleString('es-MX')}`;
+  document.getElementById('sim-price').textContent  = `$${Math.round(Pn).toLocaleString('es-MX')}`;
+  const badge = document.getElementById('price-badge');
+  badge.style.display = disc > 0 ? 'inline-block' : 'none';
+  badge.textContent   = `−${disc}%`;
+
+  /* KPIs */
+  const fmtN = n => Math.round(n).toLocaleString('es-MX');
+  const fmtM = n => {
+    const abs = Math.abs(n);
+    if (abs >= 1e6) return `$${(n/1e6).toFixed(1)}M`;
+    if (abs >= 1e3) return `$${(n/1e3).toFixed(0)}K`;
+    return `$${Math.round(n).toLocaleString('es-MX')}`;
+  };
+
+  document.getElementById('kpi-ventas').textContent = fmtN(Qsim);
+  document.getElementById('kpi-ing').textContent    = fmtM(Rsim);
+  document.getElementById('kpi-dem').textContent    = fmtN(Qsim);
+  document.getElementById('kpi-margen').textContent = fmtM(Msim);
+
+  const setDelta = (id, val) => {
+    const el = document.getElementById(id);
+    if (disc === 0) { el.textContent = 'Base'; el.className = 'kd neu'; return; }
+    const sign = val > 0 ? '+' : '';
+    el.textContent = `${sign}${val.toFixed(1)}%`;
+    el.className   = `kd ${val >= 0 ? 'pos' : 'neg'}`;
+  };
+  setDelta('kpi-ventas-d', dSales);
+  setDelta('kpi-ing-d',    dRev);
+  setDelta('kpi-dem-d',    dSales);
+  setDelta('kpi-margen-d', dMargin);
+
+  /* Sparklines (6 puntos, 0% → disc%) */
+  const steps = 5;
+  const ss = [], sr = [], sm = [];
+  for (let i = 0; i <= steps; i++) {
+    const d = (disc / steps) * i;
+    const pn = P * (1 - d / 100);
+    const qn = Q * Math.pow(pn / P, e) * season;
+    ss.push(qn);
+    sr.push(pn * qn);
+    sm.push((pn - C) * qn);
+  }
+  renderSpark('sp-ventas', ss, dSales >= 0 ? '#00A86B' : '#E53935');
+  renderSpark('sp-ing',    sr, dRev   >= 0 ? '#00A86B' : '#E53935');
+  renderSpark('sp-dem',    ss, dSales >= 0 ? '#00A86B' : '#E53935');
+  renderSpark('sp-margen', sm, dMargin >= 0 ? '#00A86B' : '#E53935');
+
+  /* Confianza */
+  const ae = Math.abs(e);
+  const lvl = ae > 1.3 ? 'high' : ae > 0.5 ? 'med' : 'low';
+  const lvlLabel = { high: 'Alta', med: 'Media', low: 'Baja' };
+  const lvlColor = { high: 'var(--green)', med: 'var(--orange)', low: 'var(--red)' };
+  document.getElementById('conf-lbl').textContent = lvlLabel[lvl];
+  document.getElementById('conf-lbl').style.color = lvlColor[lvl];
+  document.getElementById('conf-fill').className  = `conf-fill ${lvl}`;
+
+  /* Justificación Qwen (debounce 900 ms) */
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => refreshQwenV2(disc, Pn, dSales, dMargin, season), 900);
+}
+
+/* ── Justificación Qwen Vista 2 ─────────────────────────── */
+async function refreshQwenV2(disc, Pn, dSales, dMargin, season) {
+  const seasonNames = { '1': 'Sin evento', '1.3': 'Regreso a Clases',
+    '1.45': 'Navidad', '1.6': 'Buen Fin', '0.85': 'Verano' };
+  const sName = seasonNames[String(season)] || 'Normal';
+
+  setLoading('qwen-v2');
+  const prompt = `SKU: ${activeSKU.name}. Precio actual: $${activeSKU.price}. Descuento simulado: ${disc}%. Elasticidad: ${activeSKU.e}. Impacto estimado: ${dSales > 0 ? '+' : ''}${dSales.toFixed(1)}% ventas, ${dMargin.toFixed(1)}% margen. Temporada: ${sName}. En máximo 2 oraciones explica por qué esta acción de precio tiene o no sentido para OfficeMax.`;
+  const r = await askQwen(prompt);
+
+  if (r) { setText('qwen-v2', r); return; }
+
+  /* Fallback dinámico */
+  const fallback = disc === 0
+    ? 'El precio base es el punto de referencia sin simulación. Mueve el slider para proyectar escenarios de descuento.'
+    : `Con un descuento del ${disc}%, las ventas proyectadas cambian ${dSales > 0 ? '+' : ''}${dSales.toFixed(1)}% y el margen ${dMargin.toFixed(1)}%. ${Math.abs(activeSKU.e) > 1 ? 'Al ser un SKU elástico, el mayor volumen puede compensar la reducción de precio.' : 'Al ser poco elástico, el descuento puede no generar suficiente volumen para compensar la pérdida de margen.'}`;
+  setText('qwen-v2', fallback, true);
+}
+
+/* ── Tabla SKUs solución ────────────────────────────────── */
+function renderSKUTable() {
+  document.getElementById('sku-tbl-body').innerHTML = SKUS.map(s => {
+    const cls = s.e < -1 ? 'elastic' : s.e < -0.5 ? 'border' : 'inelastic';
+    const lbl = s.e < -1 ? 'Elástico' : s.e < -0.5 ? 'Borderline' : 'Inelástico';
+    return `<tr>
+      <td><code>${s.id}</code></td>
+      <td>${s.name}</td>
+      <td><span class="e-badge ${cls}">${s.e}</span></td>
+      <td>${lbl}</td>
+      <td>${s.sales.toLocaleString('es-MX')} u.</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Exportar CSV ───────────────────────────────────────── */
+function exportCSV() {
+  const disc = +document.getElementById('disc-slider').value;
+  const season = +document.getElementById('season-sel').value;
+  const period = +document.getElementById('period-sel').value;
+
+  const rows = [['SKU','Nombre','Precio Base','Descuento %','Precio Nuevo',
+    'Ventas Simuladas','Ingresos Simulados','Margen Simulado','Elasticidad','Temporada']];
+
+  SKUS.forEach(s => {
+    const Pn = s.price * (1 - disc / 100);
+    const Qs = s.sales * Math.pow(Pn / s.price, s.e) * season;
+    rows.push([
+      s.id, s.name, s.price, `${disc}%`, Math.round(Pn),
+      Math.round(Qs * period), Math.round(Pn * Qs * period),
+      Math.round((Pn - s.cost) * Qs * period), s.e, season
+    ]);
+  });
+
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = `PromoIntel_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+/* ── Chat ───────────────────────────────────────────────── */
+function toggleChat() {
+  document.getElementById('chat-panel').classList.toggle('open');
+}
+
+async function sendChat() {
+  const inp = document.getElementById('chat-in');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = '';
+
+  addMsg(msg, 'user');
+  chatHistory.push({ role: 'user', content: msg });
+
+  const thinkId = addMsg('PromoIntel está analizando…', 'thinking');
+
+  const dept = document.getElementById('dept-filter').value.toUpperCase();
+  const histStr = chatHistory.map(m =>
+    `${m.role === 'user' ? 'Usuario' : 'PromoIntel'}: ${m.content}`).join('\n');
+
+  const prompt = `Eres PromoIntel AI, asistente de pricing para OfficeMax. Departamento activo: ${dept}. SKU seleccionado: ${activeSKU.name}, elasticidad: ${activeSKU.e}, precio base: $${activeSKU.price}. Datos: 5 SKUs de papel, mejor promo Desc. 15% con +32% ingresos.\nHistorial:\n${histStr}\nResponde en español, máximo 3 oraciones, orientado a acción.`;
+
+  const r = await askQwen(prompt);
+
+  document.getElementById(thinkId)?.remove();
+
+  const reply = r || mockReply(msg);
+  addMsg(reply, 'bot');
+  chatHistory.push({ role: 'assistant', content: reply });
+}
+
+function mockReply(msg) {
+  const m = msg.toLowerCase();
+  if (m.includes('promov') || m.includes('promo')) {
+    return `Te recomiendo promover ${activeSKU.name} con un descuento del 15%. Su elasticidad de ${activeSKU.e} garantiza que el aumento en volumen compensará la reducción de precio. Es la acción con mejor ROI proyectado en el departamento PAPEL.`;
+  }
+  if (m.includes('precio') || m.includes('descuento') || m.includes('bajar')) {
+    return `Para ${activeSKU.name}, un descuento del 10–15% genera el mejor balance entre incremento de ventas e impacto en margen según su elasticidad (${activeSKU.e}). Considera la temporada: en Regreso a Clases el multiplicador de demanda es 1.3x.`;
+  }
+  if (m.includes('margen') || m.includes('rentab')) {
+    return 'Los SKUs más inelásticos (Papel Bond 75g, Papel Reciclado 60g) son los más seguros para mantener margen. Para proteger rentabilidad, considera promociones de volumen (3x2) en los SKUs elásticos en lugar de descuentos directos.';
+  }
+  return `Basado en el análisis del departamento PAPEL, ${activeSKU.name} tiene una elasticidad de ${activeSKU.e} y ventas promedio de ${activeSKU.sales.toLocaleString('es-MX')} u. La acción de mejor impacto es un descuento del 15% en temporada de alta demanda.`;
+}
+
+function addMsg(text, type) {
+  const el = document.createElement('div');
+  const id = `m${Date.now()}`;
+  el.id = id;
+  el.className = `cmsg ${type}`;
+  el.innerHTML = type === 'thinking'
+    ? `<span class="spinner"></span> ${text}`
+    : text;
+  const box = document.getElementById('chat-msgs');
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+  return id;
+}
+
+/* ── Inicialización ─────────────────────────────────────── */
+async function init() {
+  await pingOllama();
+  renderChartPromo();
+  renderChartScatter();
+  renderChartTemporal();
+  loadInterps();
+  updateSKU();
+  renderSKUTable();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
