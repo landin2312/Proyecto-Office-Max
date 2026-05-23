@@ -757,33 +757,38 @@ let csvLoaded   = false;
 let chatHistory = [];
 let charts      = {};
 let debounceTimer = null;
+const QWEN_MODELS = ['qwen2', 'qwen2:latest', 'qwen2.5', 'qwen2.5:latest'];
 
 /* ══════════════════════════════════════════════════════════
    ARREGLO 3 — QWEN SIN PING INICIAL
    Siempre intenta la llamada real. Badge = resultado de la ÚLTIMA llamada.
 ══════════════════════════════════════════════════════════ */
 async function askQwen(prompt) {
-  try {
-    const res = await fetch('http://localhost:11434/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'qwen2', prompt, stream: false })
-    });
-    const data = await res.json();
-    const response = data.response ?? null;
-    if (response) setBadge(true);
-    return response;
-  } catch { return null; }
+  for (const model of QWEN_MODELS) {
+    try {
+      const res = await fetch('http://localhost:11434/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, prompt, stream: false })
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const response = data.response ?? null;
+      if (response) { setBadge(true, model); return response; }
+    } catch {}
+  }
+  setBadge(false);
+  return null;
 }
 
-function setBadge(active) {
+function setBadge(active, model = 'Qwen2') {
   const b = document.getElementById('status-badge');
   const d = document.getElementById('status-dot');
   const t = document.getElementById('status-text');
   if (active) {
     b.className = 'status-badge online';
     d.className = 'status-dot online';
-    t.textContent = '🟢 Qwen2 activo';
+    t.textContent = `🟢 ${model} activo`;
   } else {
     b.className = 'status-badge offline';
     d.className = 'status-dot offline';
@@ -794,12 +799,79 @@ function setBadge(active) {
 /* ══════════════════════════════════════════════════════════
    ARREGLO 1 — CARGA Y PARSEO DE CSV
 ══════════════════════════════════════════════════════════ */
+const COLUMN_ALIASES = {
+  sku: ['sku','id_sku','sku_id','codigo_sku','codigo_producto','numero_producto','numero_de_producto','num_producto','no_producto','product_number','product_num','product_no','product_id','prod_nbr','prod_no','item','item_id','item_number','articulo','material'],
+  unidades: ['unidades','unidad','uds','piezas','pz','cantidad','cantidad_vendida','qty','quantity','units','units_sold','sales_units','venta_unidades','ventas_unidades','volumen','demanda'],
+  venta_neta: ['venta_neta','ventas_netas','venta','ventas','sales','net_sales','importe','importe_venta','ingreso','ingresos','revenue','monto','monto_venta','venta_total','total_venta','total_sales','amount'],
+  precio: ['precio','precio_venta','precio_unitario','precio_promedio','precio_prom','price','unit_price','avg_price','precio_actual','pvp','pv','retail_price'],
+  costo: ['costo','cost','unit_cost','costo_unitario','costo_promedio','avg_cost'],
+  elasticidad: ['elasticidad','elasticity','beta','coeficiente','coef_elasticidad','e'],
+  nombre: ['nombre','nombre_producto','producto','descripcion','descripcion_producto','product_name','product','prod_nm','item_name','sku_name','description'],
+  categoria: ['categoria','category','cat','clase','class','class_nm','subcategoria','sub_category','subdepartamento','subdept','subdept_nm','familia','linea'],
+  departamento: ['departamento','department','dept','dept_nm','area','division'],
+  marca: ['marca','brand','tipo_marca','vendor','vendor_nm','fabricante','proveedor'],
+  promocion: ['promocion','promo','promotion','tipo_promocion','promo_type','mecanica','mecanica_promocion'],
+  fecha: ['fecha','date','tran_date','transaction_date','fecha_venta','fecha_transaccion','periodo','mes']
+};
+const ALIAS_TO_CANONICAL = Object.entries(COLUMN_ALIASES).reduce((acc, [canonical, aliases]) => {
+  aliases.forEach(a => { acc[a] = canonical; });
+  return acc;
+}, {});
+
+function normalizeKey(value) {
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/[%$#]/g, '')
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+function resolveHeader(header) {
+  const key = normalizeKey(header);
+  if (ALIAS_TO_CANONICAL[key]) return ALIAS_TO_CANONICAL[key];
+  const compact = key.replace(/_/g, '');
+  const hit = Object.entries(ALIAS_TO_CANONICAL).find(([alias]) => alias.replace(/_/g, '') === compact);
+  if (hit) return hit[1];
+  if ((key.includes('sku') || key.includes('producto') || key.includes('product')) && key.includes('num')) return 'sku';
+  if ((key.includes('cantidad') || key.includes('unit') || key.includes('pieza')) && !key.includes('precio')) return 'unidades';
+  if ((key.includes('venta') || key.includes('sales') || key.includes('revenue') || key.includes('ingreso')) && !key.includes('unidad')) return 'venta_neta';
+  if (key.includes('precio') || key.endsWith('price')) return 'precio';
+  if (key.includes('fecha') || key.includes('date')) return 'fecha';
+  return key || 'columna';
+}
+function parseNumber(value) {
+  if (value === null || value === undefined) return NaN;
+  let s = String(value).trim();
+  if (!s) return NaN;
+  s = s.replace(/\s/g, '').replace(/[$%]/g, '');
+  const comma = s.lastIndexOf(','), dot = s.lastIndexOf('.');
+  if (comma > -1 && dot > -1) s = comma > dot ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  else if (comma > -1) {
+    const decimals = s.length - comma - 1;
+    s = decimals > 0 && decimals <= 2 ? s.replace(',', '.') : s.replace(/,/g, '');
+  }
+  return parseFloat(s);
+}
+function getField(row, canonical, fallback = '') {
+  if (!row) return fallback;
+  if (row[canonical] !== undefined && row[canonical] !== '') return row[canonical];
+  for (const alias of COLUMN_ALIASES[canonical] || []) {
+    if (row[alias] !== undefined && row[alias] !== '') return row[alias];
+  }
+  return fallback;
+}
+function normText(value) {
+  return normalizeKey(value).replace(/_/g, ' ');
+}
+function detectDelimiter(line) {
+  return [',',';','\t','|']
+    .map(d => ({ d, n: splitCSVLine(line, d).length }))
+    .sort((a,b) => b.n - a.n)[0].d;
+}
+
 // Divide una línea CSV respetando campos entre comillas
-function splitCSVLine(line) {
+function splitCSVLine(line, delimiter = ',') {
   const res = []; let cur = '', inQ = false;
   for (const ch of line) {
     if (ch === '"') { inQ = !inQ; continue; }
-    if (ch === ',' && !inQ) { res.push(cur.trim()); cur = ''; continue; }
+    if (ch === delimiter && !inQ) { res.push(cur.trim()); cur = ''; continue; }
     cur += ch;
   }
   res.push(cur.trim());
@@ -810,26 +882,38 @@ function parseCSVText(text) {
   const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
   if (lines.length < 2) throw new Error('El CSV está vacío o solo tiene encabezado.');
 
-  // Normalizar headers: minúsculas, sin acentos complicados, espacios → _
-  const headers = splitCSVLine(lines[0]).map(h =>
-    h.toLowerCase().trim().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'_')
-  );
+  const delimiter = detectDelimiter(lines[0]);
+  const seen = {};
+  const headers = splitCSVLine(lines[0], delimiter).map(h => {
+    const canonical = resolveHeader(h);
+    seen[canonical] = (seen[canonical] || 0) + 1;
+    return seen[canonical] === 1 ? canonical : `${canonical}_${seen[canonical]}`;
+  });
 
-  const mandatory = ['sku','unidades','venta_neta'];
-  const missing = mandatory.filter(c => !headers.includes(c));
-  if (missing.length) throw new Error(`Columnas obligatorias faltantes: ${missing.join(', ')}`);
+  const has = c => headers.includes(c);
+  const missing = [];
+  if (!has('sku')) missing.push('SKU / numero_producto / product_number');
+  if (!has('unidades')) missing.push('unidades / cantidad / qty');
+  if (!has('venta_neta') && !has('precio')) missing.push('venta_neta / ventas / revenue o precio');
+  if (missing.length) throw new Error(`No pude identificar estas columnas: ${missing.join('; ')}`);
 
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
-    const vals = splitCSVLine(lines[i]);
+    const vals = splitCSVLine(lines[i], delimiter);
     if (vals.length < 2) continue;
     const row = {};
     headers.forEach((h, j) => { row[h] = (vals[j] || '').replace(/^"|"$/g, ''); });
-    // Calcular precio si no viene
+    row.sku = String(getField(row, 'sku')).trim();
+    if (!row.sku) continue;
+
+    // Calcular precio o venta si no vienen
     if (!row.precio || row.precio === '') {
-      const u = parseFloat(row.unidades) || 1;
-      const v = parseFloat(row.venta_neta) || 0;
+      const u = parseNumber(row.unidades) || 1;
+      const v = parseNumber(row.venta_neta) || 0;
       row.precio = u > 0 ? String(v / u) : '0';
+    }
+    if ((!row.venta_neta || row.venta_neta === '') && row.precio && row.unidades) {
+      row.venta_neta = String((parseNumber(row.precio) || 0) * (parseNumber(row.unidades) || 0));
     }
     rows.push(row);
   }
@@ -862,31 +946,30 @@ function classifyE(e) {
 function buildSKUsFromRows(rows) {
   const map = {};
   rows.forEach(r => {
-    const id = r.sku || r.prod_nbr || 'UNKNOWN';
+    const id = String(getField(r, 'sku', 'UNKNOWN')).trim();
     if (!map[id]) map[id] = [];
     map[id].push(r);
   });
 
   return Object.entries(map).map(([id, sr]) => {
-    const prices  = sr.map(r => parseFloat(r.precio)).filter(p => p > 0);
-    const units   = sr.map(r => parseFloat(r.unidades)).filter(u => !isNaN(u) && u >= 0);
-    const incomes = sr.map(r => parseFloat(r.venta_neta)).filter(v => !isNaN(v));
+    const prices  = sr.map(r => parseNumber(getField(r, 'precio'))).filter(p => p > 0);
+    const units   = sr.map(r => parseNumber(getField(r, 'unidades'))).filter(u => !isNaN(u) && u >= 0);
+    const incomes = sr.map(r => parseNumber(getField(r, 'venta_neta'))).filter(v => !isNaN(v));
 
-    const eCSV  = sr[0]?.elasticidad ? parseFloat(sr[0].elasticidad) : NaN;
+    const eCSV  = getField(sr[0], 'elasticidad') ? parseNumber(getField(sr[0], 'elasticidad')) : NaN;
     const eCalc = isFinite(eCSV) ? eCSV : estimateElasticityLS(prices, units);
     const e     = eCalc ?? -1.0;
 
     const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
     const avgPrice = avg(prices);
-    const costRaw  = sr.find(r => r.costo && parseFloat(r.costo) > 0);
-    const cost     = costRaw ? parseFloat(costRaw.costo) : avgPrice * 0.7;
+    const costRaw  = sr.find(r => parseNumber(getField(r, 'costo')) > 0);
+    const cost     = costRaw ? parseNumber(getField(costRaw, 'costo')) : avgPrice * 0.7;
 
     // Intentar varios nombres de columna posibles
-    const nombre = sr[0]?.nombre || sr[0]?.descripcion || sr[0]?.prod_nm ||
-                   sr[0]?.brand  || id;
-    const cat    = sr[0]?.categoria || sr[0]?.class_nm  || sr[0]?.subdept_nm || 'Sin categoría';
-    const brand  = sr[0]?.marca     || sr[0]?.tipo_marca || sr[0]?.vendor_nm  || 'Sin marca';
-    const dept   = (sr[0]?.departamento || sr[0]?.dept_nm || 'sin departamento').toLowerCase();
+    const nombre = getField(sr[0], 'nombre') || getField(sr[0], 'marca') || id;
+    const cat    = getField(sr[0], 'categoria', 'Sin categoría');
+    const brand  = getField(sr[0], 'marca', 'Sin marca');
+    const dept   = normText(getField(sr[0], 'departamento', 'sin departamento'));
 
     return { id, name: nombre, e, sales: avg(units), price: avgPrice,
              cost, cat, brand, dept, icon: '📦', rawRows: sr };
@@ -989,15 +1072,15 @@ function filterData() {
   // Modo CSV: filtra filas con varios alias de columna
   let rows = [...allRows];
   if (dept  !== 'todos') rows = rows.filter(r =>
-    (r.departamento||r.dept_nm||'').toLowerCase().includes(dept));
+    normText(getField(r, 'departamento')).includes(normText(dept)));
   if (cat   !== 'todos') rows = rows.filter(r =>
-    (r.categoria||r.class_nm||r.subdept_nm||'').toLowerCase().includes(cat));
+    normText(getField(r, 'categoria')).includes(normText(cat)));
   if (skuF  !== 'todos') rows = rows.filter(r =>
-    (r.sku||r.prod_nbr||'') === skuF);
+    String(getField(r, 'sku')).trim() === String(skuF).trim());
   if (promo !== 'todos') rows = rows.filter(r =>
-    (r.promocion||r.promo||'').toLowerCase().includes(promo));
-  if (from) rows = rows.filter(r => (r.fecha||r.tran_date||'') >= from);
-  if (to)   rows = rows.filter(r => (r.fecha||r.tran_date||'') <= to);
+    normText(getField(r, 'promocion')).includes(normText(promo)));
+  if (from) rows = rows.filter(r => String(getField(r, 'fecha')) >= from);
+  if (to)   rows = rows.filter(r => String(getField(r, 'fecha')) <= to);
 
   return { skus: buildSKUsFromRows(rows), rows };
 }
@@ -1040,9 +1123,9 @@ function updateCharts(filtered) {
   if (csvLoaded && rows.length > 0) {
     const byPromo = {};
     rows.forEach(r => {
-      const p = r.promocion || r.promo || 'Sin promo';
+      const p = getField(r, 'promocion', 'Sin promo') || 'Sin promo';
       if (!byPromo[p]) byPromo[p] = 0;
-      byPromo[p] += parseFloat(r.venta_neta) || 0;
+      byPromo[p] += parseNumber(getField(r, 'venta_neta')) || 0;
     });
     const sinBase = byPromo['Sin promo'] || Math.min(...Object.values(byPromo)) || 1;
     promoLabels = Object.keys(byPromo).filter(k => k !== 'Sin promo').slice(0, 5);
@@ -1080,11 +1163,11 @@ function updateCharts(filtered) {
   let tempLabels, tempData;
   if (csvLoaded && rows.length > 0) {
     const sorted = [...rows].sort((a,b) =>
-      (a.fecha||a.tran_date||'') < (b.fecha||b.tran_date||'') ? -1 : 1);
+      String(getField(a, 'fecha')) < String(getField(b, 'fecha')) ? -1 : 1);
     const chunkSz = Math.max(1, Math.floor(sorted.length / 9));
     const avgs = Array.from({length:9}, (_,i) => {
       const ch = sorted.slice(i*chunkSz, (i+1)*chunkSz);
-      return ch.reduce((s,r) => s+(parseFloat(r.unidades)||0), 0) / (ch.length||1);
+      return ch.reduce((s,r) => s+(parseNumber(getField(r, 'unidades'))||0), 0) / (ch.length||1);
     });
     const base = avgs[0] || 1;
     tempData   = avgs.map(v => Math.round(v/base*100));
@@ -1161,6 +1244,16 @@ async function loadInterps() {
 /* ── Filtros Vista 1: filtra + actualiza gráficas + llama Qwen ── */
 function applyFilters() {
   const filtered = filterData();
+  const skuF = document.getElementById('sku-filter').value;
+  if (skuF !== 'todos') {
+    const selected = SKUS.find(s => String(s.id) === String(skuF));
+    if (selected) {
+      activeSKU = selected;
+      const v2Sel = document.getElementById('v2-sku');
+      if ([...v2Sel.options].some(o => o.value === selected.id)) v2Sel.value = selected.id;
+      updateSim();
+    }
+  }
   updateCharts(filtered);
   loadInterps();
 }
@@ -1290,6 +1383,13 @@ function updateSKU() {
   const id  = document.getElementById('v2-sku').value;
   activeSKU = SKUS.find(s => s.id === id) || SKUS[0];
   if (!activeSKU) return;
+
+  const skuFilter = document.getElementById('sku-filter');
+  if (csvLoaded && skuFilter && skuFilter.value !== id && [...skuFilter.options].some(o => o.value === id)) {
+    skuFilter.value = id;
+    updateCharts(filterData());
+    loadInterps();
+  }
 
   document.getElementById('prod-icon').textContent   = activeSKU.icon || '📦';
   document.getElementById('prod-name').textContent   = activeSKU.name;
