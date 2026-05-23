@@ -759,6 +759,7 @@ let charts      = {};
 let debounceTimer = null;
 const QWEN_MODELS = ['qwen2', 'qwen2:latest', 'qwen2.5', 'qwen2.5:latest'];
 let lastDeptValue = null;
+let lastCatValue = null;
 
 /* ══════════════════════════════════════════════════════════
    ARREGLO 3 — QWEN SIN PING INICIAL
@@ -1012,20 +1013,27 @@ function populateFilters(skus) {
   }
 
   lastDeptValue = document.getElementById('dept-filter').value;
+  refreshCategoryDropdown({ preserveSelection:false });
+  refreshPromoDropdown({ preserveSelection:false });
   refreshSkuDropdowns({ preserveSelection:false });
 }
 
-function getDeptRows(dept) {
+function getDeptRows(dept, cat = 'todos') {
   const source = csvLoaded ? allRows : SKUS.map(s => ({ sku:s.id, departamento:s.dept }));
-  if (!dept || dept === 'todos') return source;
-  return source.filter(r => normText(getField(r, 'departamento')).includes(normText(dept)));
+  let rows = source;
+  if (dept && dept !== 'todos') rows = rows.filter(r => normText(getField(r, 'departamento')).includes(normText(dept)));
+  if (cat && cat !== 'todos') rows = rows.filter(r => normText(getField(r, 'categoria')).includes(normText(cat)));
+  return rows;
 }
 
-function getDeptSKUs(dept) {
+function getDeptSKUs(dept, cat = 'todos') {
   if (!csvLoaded) {
-    return SKUS.filter(s => dept === 'todos' || s.dept === dept || s.dept.includes(dept) || normText(s.cat).includes(normText(dept)));
+    return SKUS.filter(s =>
+      (dept === 'todos' || s.dept === dept || s.dept.includes(dept) || normText(s.cat).includes(normText(dept))) &&
+      (cat === 'todos' || normText(s.cat).includes(normText(cat)))
+    );
   }
-  return buildSKUsFromRows(getDeptRows(dept)).filter(s => s.id && s.id !== 'UNKNOWN');
+  return buildSKUsFromRows(getDeptRows(dept, cat)).filter(s => s.id && s.id !== 'UNKNOWN');
 }
 
 function addSkuOptions(selectEl, skus, includeTodos) {
@@ -1040,10 +1048,11 @@ function addSkuOptions(selectEl, skus, includeTodos) {
 
 function refreshSkuDropdowns({ preserveSelection = true } = {}) {
   const dept = document.getElementById('dept-filter').value;
+  const cat = document.getElementById('cat-filter').value;
   const skuSel = document.getElementById('sku-filter');
   const v2Sel = document.getElementById('v2-sku');
   const previous = preserveSelection ? skuSel.value : 'todos';
-  const skus = getDeptSKUs(dept);
+  const skus = getDeptSKUs(dept, cat);
   const ids = new Set(skus.map(s => String(s.id)));
   const nextValue = previous !== 'todos' && ids.has(String(previous)) ? previous : 'todos';
 
@@ -1055,12 +1064,105 @@ function refreshSkuDropdowns({ preserveSelection = true } = {}) {
 
   console.debug('[PromoIntel] SKU dropdown refresh', {
     dept,
+    cat,
     skus: skus.length,
     previous,
     selected: skuSel.value,
     cleared: previous !== 'todos' && previous !== skuSel.value
   });
   return skus;
+}
+
+function refreshCategoryDropdown({ preserveSelection = true } = {}) {
+  const dept = document.getElementById('dept-filter').value;
+  const catSel = document.getElementById('cat-filter');
+  const previous = preserveSelection ? catSel.value : 'todos';
+  const rows = getDeptRows(dept, 'todos');
+  const cats = [...new Map(rows
+    .map(r => String(getField(r, 'categoria')).trim())
+    .filter(Boolean)
+    .map(c => [normText(c), c])
+  ).values()].sort((a,b) => a.localeCompare(b, 'es'));
+  const valid = new Set(cats.map(c => normText(c)));
+  catSel.innerHTML = '<option value="todos">Todas</option>';
+  cats.forEach(c => {
+    const o = document.createElement('option');
+    o.value = normText(c);
+    o.textContent = c.charAt(0).toUpperCase() + c.slice(1).toLowerCase();
+    catSel.appendChild(o);
+  });
+  catSel.value = previous !== 'todos' && valid.has(normText(previous)) ? normText(previous) : 'todos';
+  lastCatValue = catSel.value;
+  console.debug('[PromoIntel] Category dropdown refresh', {
+    dept,
+    categories: cats.length,
+    previous,
+    selected: catSel.value
+  });
+}
+
+function hasRealPromo(rows = allRows) {
+  return rows.some(r => normText(getField(r, 'promocion')).length > 0);
+}
+
+function getScenarioOptions(rows = allRows) {
+  const candidates = [
+    ['scenario:ingresos_sim_menos_10pct', 'Desc. 10%'],
+    ['scenario:ingresos_sim_menos_5pct',  'Desc. 5%'],
+    ['scenario:ingresos_sim_mas_5pct',    'Aum. 5%'],
+    ['scenario:ingresos_sim_mas_10pct',   'Aum. 10%']
+  ];
+  return candidates.filter(([value]) =>
+    rows.some(r => isFinite(parseNumber(r[value.replace('scenario:', '')])))
+  );
+}
+
+function refreshPromoDropdown({ preserveSelection = true } = {}) {
+  const promoSel = document.getElementById('promo-filter');
+  const previous = preserveSelection ? promoSel.value : 'todos';
+  const rows = csvLoaded
+    ? getDeptRows(document.getElementById('dept-filter').value, document.getElementById('cat-filter').value)
+    : [];
+  promoSel.innerHTML = '<option value="todos">Todas</option>';
+
+  let values = [];
+  if (csvLoaded && hasRealPromo(rows)) {
+    values = [...new Map(rows
+      .map(r => String(getField(r, 'promocion')).trim())
+      .filter(Boolean)
+      .map(p => [normText(p), { value:normText(p), label:p }])
+    ).values()];
+  } else if (csvLoaded) {
+    values = getScenarioOptions(rows).map(([value, label]) => ({ value, label }));
+  } else {
+    values = [
+      { value:'desc15', label:'Desc. 15%' },
+      { value:'desc20', label:'Desc. 20%' },
+      { value:'3x2', label:'3x2' },
+      { value:'2x1', label:'2x1' },
+      { value:'otros', label:'Otros' }
+    ];
+  }
+
+  values.forEach(({ value, label }) => {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = label;
+    promoSel.appendChild(o);
+  });
+  const valid = new Set(values.map(v => v.value));
+  promoSel.value = previous !== 'todos' && valid.has(previous) ? previous : 'todos';
+  console.debug('[PromoIntel] Promo dropdown refresh', {
+    realPromo: csvLoaded && hasRealPromo(rows),
+    options: values.length,
+    previous,
+    selected: promoSel.value
+  });
+}
+
+function getSelectedLabel(selectId, fallback = 'Todas') {
+  const sel = document.getElementById(selectId);
+  return sel?.selectedOptions?.[0]?.textContent || fallback;
 }
 
 // Listener del input de archivo
@@ -1126,7 +1228,7 @@ function filterData() {
     normText(getField(r, 'categoria')).includes(normText(cat)));
   if (skuF  !== 'todos') rows = rows.filter(r =>
     String(getField(r, 'sku')).trim() === String(skuF).trim());
-  if (promo !== 'todos') rows = rows.filter(r =>
+  if (promo !== 'todos' && !promo.startsWith('scenario:')) rows = rows.filter(r =>
     normText(getField(r, 'promocion')).includes(normText(promo)));
   if (from) rows = rows.filter(r => normalizeDateValue(getField(r, 'fecha')) >= from);
   if (to)   rows = rows.filter(r => normalizeDateValue(getField(r, 'fecha')) <= to);
@@ -1139,9 +1241,9 @@ function setActiveSKUFromFiltered(filtered) {
   let nextSKU = null;
   if (skuF !== 'todos') {
     nextSKU = filtered.skus.find(s => String(s.id) === String(skuF));
-    if (!nextSKU) nextSKU = getDeptSKUs(document.getElementById('dept-filter').value).find(s => String(s.id) === String(skuF));
+    if (!nextSKU) nextSKU = getDeptSKUs(document.getElementById('dept-filter').value, document.getElementById('cat-filter').value).find(s => String(s.id) === String(skuF));
   }
-  if (!nextSKU) nextSKU = filtered.skus[0] || getDeptSKUs(document.getElementById('dept-filter').value)[0] || SKUS[0];
+  if (!nextSKU) nextSKU = filtered.skus[0] || getDeptSKUs(document.getElementById('dept-filter').value, document.getElementById('cat-filter').value)[0] || SKUS[0];
   if (!nextSKU) return null;
   activeSKU = nextSKU;
 
@@ -1195,6 +1297,7 @@ function updateCharts(filtered) {
 
   /* ── Chart 1: Ingresos por tipo de promoción ── */
   let promoLabels, promoData;
+  const promoSelected = document.getElementById('promo-filter').value;
   if (csvLoaded && rows.length > 0) {
     const byPromo = {};
     const hasPromo = rows.some(r => normText(getField(r, 'promocion')).length > 0);
@@ -1214,9 +1317,12 @@ function updateCharts(filtered) {
         ['Aum. 5%',   'ingresos_sim_mas_5pct'],
         ['Aum. 10%',  'ingresos_sim_mas_10pct']
       ];
+      const activeScenarios = promoSelected.startsWith('scenario:')
+        ? scenarios.filter(([, field]) => field === promoSelected.replace('scenario:', ''))
+        : scenarios;
       const base = rows.reduce((s,r) => s + (parseNumber(r.ingresos_reales) || parseNumber(getField(r, 'venta_neta')) || 0), 0) || 1;
-      promoLabels = scenarios.map(([label]) => label);
-      promoData = scenarios.map(([, field]) => {
+      promoLabels = activeScenarios.map(([label]) => label);
+      promoData = activeScenarios.map(([, field]) => {
         const total = rows.reduce((s,r) => s + (parseNumber(r[field]) || 0), 0);
         return parseFloat(((total/base - 1)*100).toFixed(1));
       });
@@ -1308,7 +1414,7 @@ function setText(id, txt, manual = false) {
 async function loadInterps() {
   const dept      = document.getElementById('dept-filter').value.toUpperCase();
   const promoSel  = document.getElementById('promo-filter').value;
-  const promoLabel = promoSel === 'todos' ? 'Desc. 15%' : promoSel;
+  const promoLabel = promoSel === 'todos' ? 'Todas' : getSelectedLabel('promo-filter', promoSel);
   const filtered  = filterData();
   const skus      = filtered.skus;
   const topE      = [...skus].sort((a,b) => a.e - b.e)[0];
@@ -1339,9 +1445,16 @@ async function loadInterps() {
 /* ── Filtros Vista 1: filtra + actualiza gráficas + llama Qwen ── */
 function applyFilters() {
   const dept = document.getElementById('dept-filter').value;
+  const cat = document.getElementById('cat-filter').value;
   if (dept !== lastDeptValue) {
+    refreshCategoryDropdown({ preserveSelection:true });
+    refreshPromoDropdown({ preserveSelection:true });
     refreshSkuDropdowns({ preserveSelection:true });
     lastDeptValue = dept;
+  } else if (cat !== lastCatValue) {
+    refreshPromoDropdown({ preserveSelection:true });
+    refreshSkuDropdowns({ preserveSelection:true });
+    lastCatValue = cat;
   }
   const filtered = filterData();
   setActiveSKUFromFiltered(filtered);
@@ -1349,6 +1462,7 @@ function applyFilters() {
   updateSim();
   console.debug('[PromoIntel] Filters applied', {
     dept,
+    cat: document.getElementById('cat-filter').value,
     sku: document.getElementById('sku-filter').value,
     rows: filtered.rows.length,
     skus: filtered.skus.length
