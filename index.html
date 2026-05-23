@@ -802,10 +802,10 @@ function setBadge(active, model = 'Qwen2') {
 const COLUMN_ALIASES = {
   sku: ['sku','id_sku','sku_id','codigo_sku','codigo_producto','numero_producto','numero_de_producto','num_producto','no_producto','product_number','product_num','product_no','product_id','prod_nbr','prod_no','item','item_id','item_number','articulo','material'],
   unidades: ['unidades','unidad','uds','piezas','pz','cantidad','cantidad_vendida','qty','quantity','units','units_sold','sales_units','venta_unidades','ventas_unidades','volumen','demanda'],
-  venta_neta: ['venta_neta','ventas_netas','venta','ventas','sales','net_sales','importe','importe_venta','ingreso','ingresos','revenue','monto','monto_venta','venta_total','total_venta','total_sales','amount'],
+  venta_neta: ['venta_neta','ventas_netas','venta','ventas','sales','net_sale','net_sales','importe','importe_venta','ingreso','ingresos','revenue','monto','monto_venta','venta_total','total_venta','total_sales','amount'],
   precio: ['precio','precio_venta','precio_unitario','precio_promedio','precio_prom','price','unit_price','avg_price','precio_actual','pvp','pv','retail_price'],
   costo: ['costo','cost','unit_cost','costo_unitario','costo_promedio','avg_cost'],
-  elasticidad: ['elasticidad','elasticity','beta','coeficiente','coef_elasticidad','e'],
+  elasticidad: ['elasticidad','elasticity','beta','beta_utilizada','coeficiente','coef_elasticidad','e'],
   nombre: ['nombre','nombre_producto','producto','descripcion','descripcion_producto','product_name','product','prod_nm','item_name','sku_name','description'],
   categoria: ['categoria','category','cat','clase','class','class_nm','subcategoria','sub_category','subdepartamento','subdept','subdept_nm','familia','linea'],
   departamento: ['departamento','department','dept','dept_nm','area','division'],
@@ -826,6 +826,12 @@ function normalizeKey(value) {
 function resolveHeader(header) {
   const key = normalizeKey(header);
   if (ALIAS_TO_CANONICAL[key]) return ALIAS_TO_CANONICAL[key];
+  if (
+    key === 'ingresos_reales' ||
+    key.startsWith('ingresos_sim_') ||
+    key.startsWith('unidades_sim_') ||
+    key.startsWith('precio_nuevo_')
+  ) return key;
   const compact = key.replace(/_/g, '');
   const hit = Object.entries(ALIAS_TO_CANONICAL).find(([alias]) => alias.replace(/_/g, '') === compact);
   if (hit) return hit[1];
@@ -859,6 +865,18 @@ function getField(row, canonical, fallback = '') {
 }
 function normText(value) {
   return normalizeKey(value).replace(/_/g, ' ');
+}
+function normalizeDateValue(value) {
+  const s = String(value ?? '').trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
+  if (m) {
+    const y = m[3].length === 2 ? `20${m[3]}` : m[3];
+    return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? s : d.toISOString().slice(0, 10);
 }
 function detectDelimiter(line) {
   return [',',';','\t','|']
@@ -915,6 +933,7 @@ function parseCSVText(text) {
     if ((!row.venta_neta || row.venta_neta === '') && row.precio && row.unidades) {
       row.venta_neta = String((parseNumber(row.precio) || 0) * (parseNumber(row.unidades) || 0));
     }
+    if (row.fecha) row.fecha = normalizeDateValue(row.fecha);
     rows.push(row);
   }
   return rows;
@@ -1079,8 +1098,8 @@ function filterData() {
     String(getField(r, 'sku')).trim() === String(skuF).trim());
   if (promo !== 'todos') rows = rows.filter(r =>
     normText(getField(r, 'promocion')).includes(normText(promo)));
-  if (from) rows = rows.filter(r => String(getField(r, 'fecha')) >= from);
-  if (to)   rows = rows.filter(r => String(getField(r, 'fecha')) <= to);
+  if (from) rows = rows.filter(r => normalizeDateValue(getField(r, 'fecha')) >= from);
+  if (to)   rows = rows.filter(r => normalizeDateValue(getField(r, 'fecha')) <= to);
 
   return { skus: buildSKUsFromRows(rows), rows };
 }
@@ -1122,15 +1141,35 @@ function updateCharts(filtered) {
   let promoLabels, promoData;
   if (csvLoaded && rows.length > 0) {
     const byPromo = {};
+    const hasPromo = rows.some(r => normText(getField(r, 'promocion')).length > 0);
     rows.forEach(r => {
       const p = getField(r, 'promocion', 'Sin promo') || 'Sin promo';
       if (!byPromo[p]) byPromo[p] = 0;
       byPromo[p] += parseNumber(getField(r, 'venta_neta')) || 0;
     });
-    const sinBase = byPromo['Sin promo'] || Math.min(...Object.values(byPromo)) || 1;
-    promoLabels = Object.keys(byPromo).filter(k => k !== 'Sin promo').slice(0, 5);
-    promoData   = promoLabels.map(p => parseFloat(((byPromo[p]/sinBase - 1)*100).toFixed(1)));
-    if (promoLabels.length === 0) { promoLabels = PROMO_MOCK.labels; promoData = PROMO_MOCK.data; }
+    if (hasPromo && Object.keys(byPromo).some(k => k !== 'Sin promo')) {
+      const sinBase = byPromo['Sin promo'] || Math.min(...Object.values(byPromo)) || 1;
+      promoLabels = Object.keys(byPromo).filter(k => k !== 'Sin promo').slice(0, 5);
+      promoData   = promoLabels.map(p => parseFloat(((byPromo[p]/sinBase - 1)*100).toFixed(1)));
+    } else {
+      const scenarios = [
+        ['Desc. 10%', 'ingresos_sim_menos_10pct'],
+        ['Desc. 5%',  'ingresos_sim_menos_5pct'],
+        ['Aum. 5%',   'ingresos_sim_mas_5pct'],
+        ['Aum. 10%',  'ingresos_sim_mas_10pct']
+      ];
+      const base = rows.reduce((s,r) => s + (parseNumber(r.ingresos_reales) || parseNumber(getField(r, 'venta_neta')) || 0), 0) || 1;
+      promoLabels = scenarios.map(([label]) => label);
+      promoData = scenarios.map(([, field]) => {
+        const total = rows.reduce((s,r) => s + (parseNumber(r[field]) || 0), 0);
+        return parseFloat(((total/base - 1)*100).toFixed(1));
+      });
+      if (promoData.every(v => !isFinite(v) || v === -100)) {
+        const f = SKUS.length > 0 ? skus.length / SKUS.length : 1;
+        promoLabels = PROMO_MOCK.labels;
+        promoData = PROMO_MOCK.data.map(v => parseFloat((v * f).toFixed(1)));
+      }
+    }
   } else {
     const f = SKUS.length > 0 ? skus.length / SKUS.length : 1;
     promoLabels = PROMO_MOCK.labels;
@@ -1163,7 +1202,7 @@ function updateCharts(filtered) {
   let tempLabels, tempData;
   if (csvLoaded && rows.length > 0) {
     const sorted = [...rows].sort((a,b) =>
-      String(getField(a, 'fecha')) < String(getField(b, 'fecha')) ? -1 : 1);
+      normalizeDateValue(getField(a, 'fecha')) < normalizeDateValue(getField(b, 'fecha')) ? -1 : 1);
     const chunkSz = Math.max(1, Math.floor(sorted.length / 9));
     const avgs = Array.from({length:9}, (_,i) => {
       const ch = sorted.slice(i*chunkSz, (i+1)*chunkSz);
