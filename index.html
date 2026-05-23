@@ -758,6 +758,7 @@ let chatHistory = [];
 let charts      = {};
 let debounceTimer = null;
 const QWEN_MODELS = ['qwen2', 'qwen2:latest', 'qwen2.5', 'qwen2.5:latest'];
+let lastDeptValue = null;
 
 /* ══════════════════════════════════════════════════════════
    ARREGLO 3 — QWEN SIN PING INICIAL
@@ -997,16 +998,6 @@ function buildSKUsFromRows(rows) {
 
 // Repobla los dropdowns de filtros con datos del CSV
 function populateFilters(skus) {
-  // SKU filter
-  const skuSel = document.getElementById('sku-filter');
-  skuSel.innerHTML = '<option value="todos">Todos</option>';
-  skus.forEach(s => {
-    const o = document.createElement('option');
-    o.value = s.id;
-    o.textContent = `${s.id} — ${s.name.slice(0,28)}`;
-    skuSel.appendChild(o);
-  });
-
   // Dept filter (solo si el CSV trae datos de departamento)
   const depts = [...new Set(skus.map(s=>s.dept).filter(d => d && d !== 'sin departamento'))];
   if (depts.length > 0) {
@@ -1020,15 +1011,56 @@ function populateFilters(skus) {
     });
   }
 
-  // Vista 2 SKU select
-  const v2Sel = document.getElementById('v2-sku');
-  v2Sel.innerHTML = '';
-  skus.slice(0, 100).forEach(s => {
+  lastDeptValue = document.getElementById('dept-filter').value;
+  refreshSkuDropdowns({ preserveSelection:false });
+}
+
+function getDeptRows(dept) {
+  const source = csvLoaded ? allRows : SKUS.map(s => ({ sku:s.id, departamento:s.dept }));
+  if (!dept || dept === 'todos') return source;
+  return source.filter(r => normText(getField(r, 'departamento')).includes(normText(dept)));
+}
+
+function getDeptSKUs(dept) {
+  if (!csvLoaded) {
+    return SKUS.filter(s => dept === 'todos' || s.dept === dept || s.dept.includes(dept) || normText(s.cat).includes(normText(dept)));
+  }
+  return buildSKUsFromRows(getDeptRows(dept)).filter(s => s.id && s.id !== 'UNKNOWN');
+}
+
+function addSkuOptions(selectEl, skus, includeTodos) {
+  selectEl.innerHTML = includeTodos ? '<option value="todos">Todos</option>' : '';
+  skus.forEach(s => {
     const o = document.createElement('option');
     o.value = s.id;
-    o.textContent = `${s.id} — ${s.name.slice(0,32)}`;
-    v2Sel.appendChild(o);
+    o.textContent = `${s.id} — ${String(s.name || '').slice(0, includeTodos ? 28 : 32)}`;
+    selectEl.appendChild(o);
   });
+}
+
+function refreshSkuDropdowns({ preserveSelection = true } = {}) {
+  const dept = document.getElementById('dept-filter').value;
+  const skuSel = document.getElementById('sku-filter');
+  const v2Sel = document.getElementById('v2-sku');
+  const previous = preserveSelection ? skuSel.value : 'todos';
+  const skus = getDeptSKUs(dept);
+  const ids = new Set(skus.map(s => String(s.id)));
+  const nextValue = previous !== 'todos' && ids.has(String(previous)) ? previous : 'todos';
+
+  addSkuOptions(skuSel, skus, true);
+  skuSel.value = nextValue;
+  addSkuOptions(v2Sel, skus, false);
+  if (nextValue !== 'todos' && ids.has(String(nextValue))) v2Sel.value = nextValue;
+  else if (v2Sel.options.length) v2Sel.value = v2Sel.options[0].value;
+
+  console.debug('[PromoIntel] SKU dropdown refresh', {
+    dept,
+    skus: skus.length,
+    previous,
+    selected: skuSel.value,
+    cleared: previous !== 'todos' && previous !== skuSel.value
+  });
+  return skus;
 }
 
 // Listener del input de archivo
@@ -1046,11 +1078,9 @@ document.getElementById('csv-file-input').addEventListener('change', function(e)
       if (SKUS.length === 0) throw new Error('No se encontraron SKUs válidos en el archivo.');
       csvLoaded = true;
       populateFilters(SKUS);
-      activeSKU = SKUS[0];
       document.getElementById('csv-status').innerHTML =
         `<span class="csv-ok">✅ ${file.name} · ${SKUS.length} SKUs · ${allRows.length.toLocaleString('es-MX')} filas</span>`;
       applyFilters();
-      updateSKU();
       renderSKUTable();
     } catch(err) {
       document.getElementById('csv-status').innerHTML =
@@ -1102,6 +1132,32 @@ function filterData() {
   if (to)   rows = rows.filter(r => normalizeDateValue(getField(r, 'fecha')) <= to);
 
   return { skus: buildSKUsFromRows(rows), rows };
+}
+
+function setActiveSKUFromFiltered(filtered) {
+  const skuF = document.getElementById('sku-filter').value;
+  let nextSKU = null;
+  if (skuF !== 'todos') {
+    nextSKU = filtered.skus.find(s => String(s.id) === String(skuF));
+    if (!nextSKU) nextSKU = getDeptSKUs(document.getElementById('dept-filter').value).find(s => String(s.id) === String(skuF));
+  }
+  if (!nextSKU) nextSKU = filtered.skus[0] || getDeptSKUs(document.getElementById('dept-filter').value)[0] || SKUS[0];
+  if (!nextSKU) return null;
+  activeSKU = nextSKU;
+
+  const v2Sel = document.getElementById('v2-sku');
+  if (v2Sel && [...v2Sel.options].some(o => o.value === activeSKU.id)) v2Sel.value = activeSKU.id;
+
+  console.debug('[PromoIntel] Active SKU resolved', {
+    skuFilter: skuF,
+    activeSku: activeSKU.id,
+    rows: filtered.rows.length,
+    skus: filtered.skus.length,
+    sales: activeSKU.sales,
+    price: activeSKU.price,
+    dept: activeSKU.dept
+  });
+  return activeSKU;
 }
 
 // Muestra overlay "Sin datos" sobre un chart-wrap
@@ -1282,17 +1338,21 @@ async function loadInterps() {
 
 /* ── Filtros Vista 1: filtra + actualiza gráficas + llama Qwen ── */
 function applyFilters() {
-  const filtered = filterData();
-  const skuF = document.getElementById('sku-filter').value;
-  if (skuF !== 'todos') {
-    const selected = SKUS.find(s => String(s.id) === String(skuF));
-    if (selected) {
-      activeSKU = selected;
-      const v2Sel = document.getElementById('v2-sku');
-      if ([...v2Sel.options].some(o => o.value === selected.id)) v2Sel.value = selected.id;
-      updateSim();
-    }
+  const dept = document.getElementById('dept-filter').value;
+  if (dept !== lastDeptValue) {
+    refreshSkuDropdowns({ preserveSelection:true });
+    lastDeptValue = dept;
   }
+  const filtered = filterData();
+  setActiveSKUFromFiltered(filtered);
+  renderActiveSKUDetails();
+  updateSim();
+  console.debug('[PromoIntel] Filters applied', {
+    dept,
+    sku: document.getElementById('sku-filter').value,
+    rows: filtered.rows.length,
+    skus: filtered.skus.length
+  });
   updateCharts(filtered);
   loadInterps();
 }
@@ -1417,19 +1477,8 @@ function renderSpark(id, data, color) {
   });
 }
 
-/* ── Vista 2: Actualizar SKU seleccionado ───────────────── */
-function updateSKU() {
-  const id  = document.getElementById('v2-sku').value;
-  activeSKU = SKUS.find(s => s.id === id) || SKUS[0];
+function renderActiveSKUDetails() {
   if (!activeSKU) return;
-
-  const skuFilter = document.getElementById('sku-filter');
-  if (csvLoaded && skuFilter && skuFilter.value !== id && [...skuFilter.options].some(o => o.value === id)) {
-    skuFilter.value = id;
-    updateCharts(filterData());
-    loadInterps();
-  }
-
   document.getElementById('prod-icon').textContent   = activeSKU.icon || '📦';
   document.getElementById('prod-name').textContent   = activeSKU.name;
   document.getElementById('prod-detail').textContent = `${activeSKU.cat} · ${activeSKU.brand} · ST`;
@@ -1437,10 +1486,65 @@ function updateSKU() {
   const { lbl, color } = classifyE(activeSKU.e);
   document.getElementById('prod-elast').textContent  = `Elasticidad: ${activeSKU.e} · ${lbl}`;
   document.getElementById('prod-elast').style.color  = color;
+}
+
+function getScenarioProjection(sku, disc, season) {
+  const rows = sku?.rawRows || [];
+  if (!rows.length || disc <= 0) return null;
+  const scenarios = [
+    { d:0,  units:'unidades',                 revenue:'venta_neta',                 price:'precio' },
+    { d:5,  units:'unidades_sim_menos_5pct',  revenue:'ingresos_sim_menos_5pct',    price:'precio_nuevo_menos_5pct' },
+    { d:10, units:'unidades_sim_menos_10pct', revenue:'ingresos_sim_menos_10pct',   price:'precio_nuevo_menos_10pct' }
+  ];
+  const readScenario = sc => {
+    const units = rows.map(r => parseNumber(sc.units === 'unidades' ? getField(r, 'unidades') : r[sc.units])).filter(v => isFinite(v));
+    const revenues = rows.map(r => parseNumber(sc.revenue === 'venta_neta' ? getField(r, 'venta_neta') : r[sc.revenue])).filter(v => isFinite(v));
+    const prices = rows.map(r => parseNumber(sc.price === 'precio' ? getField(r, 'precio') : r[sc.price])).filter(v => isFinite(v) && v > 0);
+    const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : NaN;
+    return { d:sc.d, q:avg(units), r:avg(revenues), p:avg(prices) };
+  };
+  const points = scenarios.map(readScenario).filter(p => isFinite(p.q) && isFinite(p.r) && isFinite(p.p));
+  if (points.length < 2) return null;
+
+  const target = Math.min(Math.max(disc, 0), 10);
+  let lo = points[0], hi = points[points.length - 1];
+  for (let i = 0; i < points.length - 1; i++) {
+    if (target >= points[i].d && target <= points[i+1].d) { lo = points[i]; hi = points[i+1]; break; }
+  }
+  const span = hi.d - lo.d || 1;
+  const w = (target - lo.d) / span;
+  const q = (lo.q + (hi.q - lo.q) * w) * season;
+  const p = lo.p + (hi.p - lo.p) * w;
+  const r = (lo.r + (hi.r - lo.r) * w) * season;
+  return { q, p, r };
+}
+
+/* ── Vista 2: Actualizar SKU seleccionado ───────────────── */
+function updateSKU() {
+  const id  = document.getElementById('v2-sku').value;
+  const skuFilter = document.getElementById('sku-filter');
+  if (skuFilter && skuFilter.value !== id && [...skuFilter.options].some(o => o.value === id)) {
+    skuFilter.value = id;
+  }
+  const filtered = filterData();
+  setActiveSKUFromFiltered(filtered);
+  if (!activeSKU) return;
+
+  console.debug('[PromoIntel] updateSKU', {
+    selected: id,
+    activeSku: activeSKU.id,
+    rows: filtered.rows.length,
+    skus: filtered.skus.length,
+    sales: activeSKU.sales
+  });
+
+  renderActiveSKUDetails();
 
   document.getElementById('disc-slider').value       = 0;
   document.getElementById('disc-val').textContent    = '0%';
   updateSim();
+  updateCharts(filtered);
+  loadInterps();
 }
 
 /* ── Vista 2: Simulación en tiempo real ─────────────────── */
@@ -1452,9 +1556,10 @@ function updateSim() {
   if (!activeSKU) return;
 
   const { price:P, cost:C, sales:Q, e } = activeSKU;
-  const Pn    = P * (1 - disc/100);
-  const Qsim  = Q * Math.pow(Pn/P, e) * season;
-  const Rsim  = Pn * Qsim * period;
+  const scenario = getScenarioProjection(activeSKU, disc, season);
+  const Pn    = scenario?.p || P * (1 - disc/100);
+  const Qsim  = scenario?.q || Q * Math.pow(Pn/P, e) * season;
+  const Rsim  = (scenario?.r || Pn * Qsim) * period;
   const Msim  = (Pn - C) * Qsim * period;
   const Rbase = P * Q * period;
   const Mbase = (P - C) * Q * period;
@@ -1491,8 +1596,8 @@ function updateSim() {
 
   const steps=5, ss=[],sr=[],sm=[];
   for(let i=0;i<=steps;i++){
-    const d=(disc/steps)*i, pn=P*(1-d/100), qn=Q*Math.pow(pn/P,e)*season;
-    ss.push(qn); sr.push(pn*qn); sm.push((pn-C)*qn);
+    const d=(disc/steps)*i, proj=getScenarioProjection(activeSKU,d,season), pn=proj?.p || P*(1-d/100), qn=proj?.q || Q*Math.pow(pn/P,e)*season;
+    ss.push(qn); sr.push(proj?.r || pn*qn); sm.push((pn-C)*qn);
   }
   renderSpark('sp-ventas',ss,dS>=0?'#00A86B':'#E53935');
   renderSpark('sp-ing',   sr,dR>=0?'#00A86B':'#E53935');
@@ -1506,6 +1611,16 @@ function updateSim() {
   document.getElementById('conf-lbl').style.color  =
     {high:'var(--green)',med:'var(--orange)',low:'var(--red)'}[lvl];
   document.getElementById('conf-fill').className   = `conf-fill ${lvl}`;
+
+  console.debug('[PromoIntel] Predictive simulation', {
+    sku: activeSKU.id,
+    disc,
+    usedScenario: !!scenario,
+    baseDemand: Q,
+    expectedDemand: Qsim,
+    price: Pn,
+    rows: activeSKU.rawRows?.length || 0
+  });
 
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(()=>refreshQwenV2(disc,Pn,dS,dM,season), 900);
