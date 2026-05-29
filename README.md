@@ -1,31 +1,289 @@
 # Proyecto Office Max
 
-Proyecto de analisis de elasticidad promocional para Office Max.
+Proyecto de analisis de elasticidad promocional para Office Max. El front publicado en GitHub Pages contiene el simulador de elasticidad; este README documenta el modelo CRISP-DM, los modelos estadisticos que alimentan el simulador y las metricas principales de evaluacion.
 
-## Contenido
+## Reporte Visual Para Revision
 
-- `index.html`: simulador interactivo de PromoIntel AI para cargar bases CSV, filtrar SKUs y visualizar graficas.
-- `scripts/`: scripts de procesamiento, modelado y generacion de reportes.
-- `Promociones/`: documentos fuente de promociones.
-- `output/`: resultados, reportes y archivos generados.
-- `PROGRESO.md`: avance del proyecto, metricas e informacion de seguimiento.
-- `requirements.txt`: dependencias necesarias para ejecutar los scripts.
+### Flujo CRISP-DM Del Proyecto
+
+```mermaid
+flowchart LR
+    A["1. Negocio<br/>Definir problema de pricing y promociones"] --> B["2. Datos<br/>Ventas, precios, costos, catalogo y tiendas"]
+    B --> C["3. Preparacion<br/>Limpieza, precio real y base SKU x tienda x mes"]
+    C --> D["4. Modelado<br/>Elasticidad log-log y modelo con controles"]
+    D --> E["5. Evaluacion<br/>R2, n observaciones, betas validas y diagnostico"]
+    E --> F["6. Despliegue<br/>Simulador web en GitHub Pages"]
+    F -. retroalimentacion .-> A
+```
+
+### Resumen Ejecutivo Del Modelo Del Simulador
+
+| Pregunta de revision | Respuesta del proyecto |
+|---|---|
+| Que predice el modelo? | El cambio esperado en unidades vendidas ante cambios de precio. |
+| Que variable usa el simulador? | `beta_precio`, que representa elasticidad precio-demanda. |
+| Cual es el modelo base? | Regresion log-log: `log(unidades + 1) = alpha + beta * log(precio_real)`. |
+| Cual es la granularidad? | `SKU x tienda x mes`. |
+| Por que esa granularidad? | Permite varias observaciones por SKU dentro de una ventana mensual usando tiendas. |
+| Como se mide calidad? | R2, numero de observaciones y porcentaje de betas calculables. |
+| Modelo recomendado para simulador | Modelo 1, porque genera mas betas y es mas interpretable. |
+| Modelo de validacion | Modelo 2, porque agrega controles y mejora R2 cuando hay datos suficientes. |
+
+### Indicadores Clave
+
+| Indicador | Modelo 1: log-log simple | Modelo 2: con controles |
+|---|---:|---:|
+| SKUs analizados | 1750 | 1750 |
+| Ventanas evaluadas | 46266 | 46266 |
+| Betas calculadas | 9924 | 6889 |
+| Cobertura de betas | 21.45% | 14.89% |
+| R2 promedio | 0.3225 | 0.6590 |
+| R2 mediana | 0.1111 | 0.7349 |
+| Beta mediana | -0.1621 | -0.5850 |
+| N mediana | 8 | 12 |
+
+### Calidad Del Modelo Por Ventana
+
+| Modelo | Ventana | Betas validas | SKUs con beta | R2 promedio | R2 mediana | Interpretacion |
+|---|---|---:|---:|---:|---:|---|
+| Modelo 1 | Mensual | 1311 | 365 | 0.4774 | 0.3333 | Mejor ventana del modelo simple para reaccion mensual. |
+| Modelo 1 | Trimestral | 3523 | 528 | 0.3537 | 0.1423 | Balance entre cobertura y estabilidad. |
+| Modelo 1 | Semestral | 5090 | 559 | 0.2610 | 0.0686 | Mayor cobertura, pero menor ajuste mediano. |
+| Modelo 2 | Mensual | 607 | 145 | 0.7117 | 0.7956 | Alto ajuste, pero menor cobertura. |
+| Modelo 2 | Trimestral | 2346 | 339 | 0.6973 | 0.7920 | Buen ajuste con controles. |
+| Modelo 2 | Semestral | 3936 | 430 | 0.6281 | 0.6823 | Mejor cobertura del modelo controlado. |
+
+### Lectura De Calidad
+
+El Modelo 1 es el modelo operativo del simulador porque produce mas elasticidades disponibles por SKU y mantiene una interpretacion directa: el coeficiente `beta_precio` indica cuanto cambia la demanda cuando cambia el precio. Su R2 no siempre es alto porque usa solo precio como variable explicativa; esto es esperado en ventas reales, donde tambien influyen tienda, estacionalidad, marca, inventario y otros factores.
+
+El Modelo 2 funciona como comprobacion estadistica adicional. Al incluir controles, su R2 promedio sube de `0.3225` a `0.6590` y su R2 mediana sube de `0.1111` a `0.7349`. Esto confirma que las variables adicionales explican mejor la cantidad vendida, aunque el modelo calcula menos ventanas porque necesita mas observaciones para evitar sobreajuste.
+
+### Clasificacion De Resultados
+
+| Modelo | Elasticos `beta < -1` | Inelasticos `-1 < beta < 0` | Beta positiva / revision |
+|---|---:|---:|---:|
+| Modelo 1 | 3588 | 1758 | 4578 |
+| Modelo 2 | 3405 | 291 | 3193 |
+
+Las betas positivas se marcan como revision porque una relacion positiva precio-cantidad puede deberse a estacionalidad, mezcla de tiendas, disponibilidad, cambios de demanda o ruido en ventanas pequenas. El simulador debe priorizar betas con R2 aceptable y suficiente `n_observaciones`.
+
+### Evidencia Para El Profesor
+
+| Elemento solicitado | Donde esta documentado |
+|---|---|
+| Metodologia CRISP-DM visual | Diagrama y seccion `Modelo CRISP-DM` de este README. |
+| Modelo que usa el simulador | Seccion `Modelo 1: Elasticidad Log-Log Simple`. |
+| Modelo de comparacion | Seccion `Modelo 2: Log-Log Con Controles`. |
+| Tabla de R2 | Secciones `Indicadores Clave` y `Calidad Del Modelo Por Ventana`. |
+| Diagnostico de datos insuficientes | Seccion `Razones Principales De Exclusion`. |
+| Archivos de resultados | `output/entrega_base19mayo/`. |
+| Front del simulador | `index.html` y GitHub Pages. |
 
 ## Simulador Interactivo
 
-El front del proyecto esta en `index.html`.
+- Front: `index.html`
+- GitHub Pages: `https://landin2312.github.io/Proyecto-Office-Max/`
+- Uso local: abrir `index.html` en el navegador.
 
-- En local: abre `index.html` en el navegador.
-- En GitHub Pages: `https://landin2312.github.io/Proyecto-Office-Max/`
+El simulador permite cargar bases CSV, filtrar SKUs, revisar elasticidad, probar descuentos y estimar impacto esperado en unidades, ingresos y margen. La logica del simulador usa elasticidades estimadas con modelos log-log y muestra confianza del modelo con base en R2 y numero de observaciones.
 
-Para publicar el simulador desde GitHub, activa Pages en `Settings > Pages` y selecciona `GitHub Actions` como fuente. Cada push a `main` publicara automaticamente el front.
+## Modelo CRISP-DM
 
-## Archivos Para Revision
+### 1. Entendimiento Del Negocio
 
-- [elasticidad_visualizaciones_v2.pdf](elasticidad_visualizaciones_v2.pdf): representacion grafica de los hallazgos.
-- [modelo1_betas_loglog.csv](output/modelo1_betas_loglog.csv): resultados del modelo log-log.
-- [modelo2_betas_con_controles.csv](output/modelo2_betas_con_controles.csv): resultados del modelo con controles.
+El objetivo del proyecto es estimar que tan sensible es la demanda de productos de Office Max ante cambios de precio y promociones. La pregunta central es:
 
-## Estado
+> Si se aplica un descuento a un SKU, cuanto podria cambiar la cantidad vendida y que impacto tendria en ingresos y margen?
 
-El detalle del avance y hallazgos esta documentado en `PROGRESO.md`.
+El resultado esperado es un simulador que apoye decisiones de pricing y promociones por SKU, separando productos elasticos, inelasticos y casos que requieren revision.
+
+### 2. Entendimiento De Los Datos
+
+Se revisaron fuentes historicas de ventas, precios, catalogo, costos y promociones. Para la entrega final se uso la base limpia `Base_OfficeMax19mayo.csv`, porque contiene las variables necesarias para estimar elasticidad de forma consistente:
+
+- SKU (`prod_nbr`)
+- tienda (`store_nbr`)
+- fecha de venta (`tran_date`)
+- unidades vendidas (`qty`)
+- precio (`precio`)
+- venta neta (`net_sale`)
+- margen (`margen`)
+- costo unitario calculado
+- departamento, subdepartamento, clase, marca y tipo de marca
+
+La base oficial de modelado se agrego a granularidad `SKU x tienda x mes`. Esta granularidad permite que una ventana mensual tenga varias observaciones por tiendas, evitando que el modelo quede con una sola observacion por SKU-mes.
+
+### 3. Preparacion De Datos
+
+El script principal de entrega es:
+
+- `scripts/analisis_elasticidad_entrega.py`
+
+Transformaciones principales:
+
+- Limpieza y conversion de variables numericas.
+- Conversion de `tran_date` a periodo mensual.
+- Filtrado de registros con unidades y precio validos.
+- Calculo de `precio_real = net_sale / unidades`, usando `precio_promedio` como respaldo.
+- Agregacion a `SKU x tienda x mes`.
+- Creacion de ventanas moviles:
+  - mensual: 1 mes
+  - trimestral: 3 meses
+  - semestral: 6 meses
+- Exclusion de ventanas no modelables por `n<3`, precio constante, unidades constantes o exceso de controles frente al numero de observaciones.
+
+Variables de promocion como `indicador_promocion`, `descuento_pct` y `tipo_promo` no se incluyeron en la base final porque no existen dentro de `Base_OfficeMax19mayo.csv`. Para evitar mezclar bases, la entrega final se mantiene solamente con esa fuente.
+
+### 4. Modelado
+
+Se construyeron dos modelos para trabajar con el simulador.
+
+#### Modelo 1: Elasticidad Log-Log Simple
+
+Formula:
+
+```text
+log(unidades + 1) = alpha + beta * log(precio_real)
+```
+
+Uso principal:
+
+- Estimar elasticidad dinamica por SKU.
+- Alimentar el simulador con una beta interpretable.
+- Comparar sensibilidad por ventana mensual, trimestral y semestral.
+
+Interpretacion de beta:
+
+- `beta < -1`: producto elastico.
+- `-1 < beta < 0`: producto inelastico.
+- `beta >= 0`: caso anomalo o candidato a revision, porque la relacion precio-cantidad no sigue el comportamiento esperado.
+
+#### Modelo 2: Log-Log Con Controles
+
+Formula base:
+
+```text
+log(unidades + 1) = alpha + beta * log(precio_real) + controles
+```
+
+Controles usados cuando existen y tienen variacion suficiente:
+
+- margen
+- `log(costo_unitario)`
+- fechas de venta
+- mes
+- tienda
+- marca
+- tipo de marca
+- departamento
+- subdepartamento
+- clase
+
+Uso principal:
+
+- Evaluar si variables adicionales mejoran la explicacion de unidades vendidas.
+- Comparar una beta de precio controlada contra el modelo simple.
+- Dar una lectura mas completa cuando hay suficientes observaciones por ventana.
+
+## Resultados De Modelos
+
+Archivos oficiales de entrega:
+
+- `output/entrega_base19mayo/modelo1_betas_loglog.csv`
+- `output/entrega_base19mayo/modelo2_betas_con_controles.csv`
+- `output/entrega_base19mayo/resumen_elasticidad_entrega.xlsx`
+- `output/entrega_base19mayo/graficas_elasticidad/`
+
+### Resumen General
+
+| Metrica | Modelo 1: log-log simple | Modelo 2: con controles |
+|---|---:|---:|
+| SKUs analizados | 1750 | 1750 |
+| Ventanas totales | 46266 | 46266 |
+| Betas calculadas | 9924 | 6889 |
+| Betas mensuales | 1311 | 607 |
+| Betas trimestrales | 3523 | 2346 |
+| Betas semestrales | 5090 | 3936 |
+| R2 promedio | 0.3225 | 0.6590 |
+| R2 mediana | 0.1111 | 0.7349 |
+| Beta mediana | -0.1621 | -0.5850 |
+| N mediana | 8 | 12 |
+
+### Tabla De R2 Por Ventana
+
+| Modelo | Ventana | Betas validas | SKUs con beta | R2 promedio | R2 mediana | Beta mediana | N mediana |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Modelo 1 | Mensual | 1311 | 365 | 0.4774 | 0.3333 | -0.9451 | 5 |
+| Modelo 1 | Trimestral | 3523 | 528 | 0.3537 | 0.1423 | -0.2686 | 8 |
+| Modelo 1 | Semestral | 5090 | 559 | 0.2610 | 0.0686 | -0.0313 | 10 |
+| Modelo 2 | Mensual | 607 | 145 | 0.7117 | 0.7956 | -0.0489 | 9 |
+| Modelo 2 | Trimestral | 2346 | 339 | 0.6973 | 0.7920 | -0.1284 | 11 |
+| Modelo 2 | Semestral | 3936 | 430 | 0.6281 | 0.6823 | -1.1283 | 13 |
+
+Lectura de la tabla:
+
+- El Modelo 1 calcula mas betas y es mas directo para simular elasticidad por SKU.
+- El Modelo 2 tiene mayor R2 porque agrega controles, pero calcula menos ventanas por falta de observaciones suficientes en algunos casos.
+- En el simulador conviene mostrar beta junto con R2 y `n_observaciones`, porque una beta extrema con bajo soporte puede ser inestable.
+
+### Clasificacion De Elasticidad
+
+| Modelo | Elasticos (`beta < -1`) | Inelasticos (`-1 < beta < 0`) | Beta positiva / revision |
+|---|---:|---:|---:|
+| Modelo 1 | 3588 | 1758 | 4578 |
+| Modelo 2 | 3405 | 291 | 3193 |
+
+### Razones Principales De Exclusion
+
+| Modelo | Razon | Ventanas |
+|---|---|---:|
+| Modelo 1 | `n<3` | 28330 |
+| Modelo 2 | `n<3` | 28330 |
+| Modelo 1 | `precio constante` | 4634 |
+| Modelo 2 | `precio constante` | 4634 |
+| Modelo 1 | `unidades constantes` | 3378 |
+| Modelo 2 | `unidades constantes` | 3378 |
+| Modelo 2 | `controles>observaciones` | 3035 |
+
+## Como Trabajan Los Modelos En El Simulador
+
+1. El usuario selecciona o carga SKUs.
+2. Para cada SKU se usa la elasticidad estimada (`beta_precio`) de la ventana disponible.
+3. El descuento simulado ajusta el precio base.
+4. La elasticidad transforma el cambio de precio en cambio esperado de unidades.
+5. El simulador calcula impacto estimado en ventas, ingresos y margen.
+6. La confianza se interpreta con R2 y numero de observaciones.
+
+Regla de negocio usada:
+
+```text
+cambio esperado en unidades ~= elasticidad * cambio porcentual en precio
+```
+
+Ejemplo: si la elasticidad es `-1.5` y el precio baja `10%`, el modelo espera un aumento aproximado de `15%` en unidades, antes de considerar restricciones operativas o de inventario.
+
+## Evaluacion
+
+El Modelo 1 es el mas adecuado para el simulador porque produce una elasticidad simple, interpretable y disponible para mas ventanas. El Modelo 2 sirve como validacion complementaria porque mejora la explicacion estadistica al incluir controles, aunque requiere mas observaciones.
+
+Limitaciones principales:
+
+- No todas las ventanas tienen suficientes datos.
+- Algunos SKUs tienen precio constante, por lo que no se puede estimar sensibilidad al precio.
+- Las betas positivas deben revisarse antes de usarse como recomendacion automatica.
+- La base final no contiene variables explicitas de promocion, por lo que el modelo mide sensibilidad precio-cantidad, no el efecto causal completo de una promocion.
+
+## Despliegue
+
+El front esta publicado con GitHub Pages desde `index.html`. Cada cambio en `main` puede publicarse automaticamente con GitHub Actions si Pages esta configurado como `GitHub Actions`.
+
+## Contenido Del Repositorio
+
+- `index.html`: simulador interactivo de PromoIntel AI.
+- `scripts/`: procesamiento, modelado y generacion de reportes.
+- `output/entrega_base19mayo/`: resultados oficiales finales.
+- `output/`: corridas previas, diagnosticos y reportes.
+- `Promociones/`: documentos fuente de promociones.
+- `PROGRESO.md`: bitacora completa del avance.
+- `requirements.txt`: dependencias necesarias para ejecutar los scripts.
