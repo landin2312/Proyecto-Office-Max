@@ -265,6 +265,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .ai-pill.good{background:rgba(0,168,107,.12);color:var(--green)}
 .ai-pill.warn{background:rgba(245,166,35,.15);color:#a65f00}
 .ai-pill.risk{background:rgba(229,57,53,.12);color:var(--red)}
+.v2-filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.result-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.result-card{background:#fff;border:1px solid #edf0f5;border-radius:8px;padding:12px;box-shadow:var(--shadow)}
+.result-card .rt{font-size:10px;text-transform:uppercase;letter-spacing:.45px;color:#777;font-weight:700}
+.result-card .rv{font-size:18px;font-weight:800;color:#1A2E5A;margin:5px 0 2px}
+.result-card .rd{font-size:11px;color:#666;line-height:1.35}
+.forecast-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.forecast-card{background:#fff;border:1px solid #edf0f5;border-radius:10px;padding:14px;box-shadow:var(--shadow)}
+.forecast-card h3{font-size:13px;font-weight:700;margin-bottom:8px;color:#222}
+.forecast-card canvas{max-height:230px}
 
 /* Export */
 .export-btn{
@@ -361,6 +371,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   .main-content{padding:12px}
   .app-header{flex-wrap:wrap;height:auto;padding:10px 14px;gap:8px}
   .kpi-grid{grid-template-columns:1fr}
+  .result-strip,.forecast-grid,.v2-filter-grid{grid-template-columns:1fr}
   .chat-panel{width:100%;right:-100%}
   .csv-bar{padding:9px 14px}
 }
@@ -461,7 +472,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="filter-group">
       <span class="filter-label">Fecha fin</span>
-      <input type="date" id="date-to" value="2025-12-31" onchange="applyFilters()">
+      <input type="date" id="date-to" value="2026-04-30" onchange="applyFilters()">
     </div>
   </div>
 
@@ -553,6 +564,29 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
     <!-- COLUMNA IZQUIERDA: controles -->
     <div class="ctrl-col">
+
+      <div class="card">
+        <h3>Filtros predictivos</h3>
+        <div class="v2-filter-grid">
+          <div class="ctrl-group">
+            <label>Departamento</label>
+            <select id="v2-dept-filter" onchange="applyPredictiveFilters()">
+              <option value="todos">Todos</option>
+              <option value="papel" selected>Papel</option>
+              <option value="archivo">Archivo y Accesorios</option>
+              <option value="carpetas">Carpetas</option>
+              <option value="suministros">Suministros de Oficina</option>
+              <option value="escolar">Artículos Escolares</option>
+            </select>
+          </div>
+          <div class="ctrl-group">
+            <label>Categoría</label>
+            <select id="v2-cat-filter" onchange="applyPredictiveFilters()">
+              <option value="todos">Todas</option>
+            </select>
+          </div>
+        </div>
+      </div>
 
       <!-- Selector SKU -->
       <div class="card">
@@ -690,6 +724,40 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
 
       </div><!-- /kpi-grid -->
+
+      <div class="result-strip">
+        <div class="result-card">
+          <div class="rt">Ingreso incremental</div>
+          <div class="rv" id="res-inc">$0</div>
+          <div class="rd" id="res-inc-d">Cambio contra escenario base</div>
+        </div>
+        <div class="result-card">
+          <div class="rt">Margen incremental</div>
+          <div class="rv" id="res-margin">$0</div>
+          <div class="rd" id="res-margin-d">Rentabilidad adicional estimada</div>
+        </div>
+        <div class="result-card">
+          <div class="rt">Unidades adicionales</div>
+          <div class="rv" id="res-units">0</div>
+          <div class="rd" id="res-units-d">Volumen incremental esperado</div>
+        </div>
+        <div class="result-card">
+          <div class="rt">Acción sugerida</div>
+          <div class="rv" id="res-action">Base</div>
+          <div class="rd" id="res-action-d">Depende de semáforo y margen</div>
+        </div>
+      </div>
+
+      <div class="forecast-grid">
+        <div class="forecast-card">
+          <h3>Base vs escenario simulado</h3>
+          <canvas id="chart-impact"></canvas>
+        </div>
+        <div class="forecast-card">
+          <h3>Curva de descuento</h3>
+          <canvas id="chart-curve"></canvas>
+        </div>
+      </div>
 
       <!-- Confianza del modelo -->
       <div class="conf-card">
@@ -1274,6 +1342,43 @@ function refreshCategoryDropdown({ preserveSelection = true } = {}) {
     previous,
     selected: catSel.value
   });
+  syncPredictiveFiltersFromMain();
+}
+
+function syncPredictiveFiltersFromMain() {
+  const deptSel = document.getElementById('dept-filter');
+  const catSel = document.getElementById('cat-filter');
+  const v2Dept = document.getElementById('v2-dept-filter');
+  const v2Cat = document.getElementById('v2-cat-filter');
+  if (!deptSel || !catSel || !v2Dept || !v2Cat) return;
+  v2Dept.value = deptSel.value;
+  const current = v2Cat.value || catSel.value;
+  v2Cat.innerHTML = catSel.innerHTML;
+  v2Cat.value = [...v2Cat.options].some(o => o.value === catSel.value) ? catSel.value : current;
+  if (![...v2Cat.options].some(o => o.value === v2Cat.value)) v2Cat.value = 'todos';
+}
+
+function applyPredictiveFilters() {
+  const deptSel = document.getElementById('dept-filter');
+  const catSel = document.getElementById('cat-filter');
+  const v2Dept = document.getElementById('v2-dept-filter');
+  const v2Cat = document.getElementById('v2-cat-filter');
+  const desiredDept = v2Dept.value;
+  const desiredCat = v2Cat.value;
+  const deptChanged = deptSel.value !== desiredDept;
+  deptSel.value = desiredDept;
+  if (deptChanged) refreshCategoryDropdown({ preserveSelection:false });
+  if ([...catSel.options].some(o => o.value === desiredCat)) catSel.value = desiredCat;
+  else catSel.value = 'todos';
+  refreshPromoDropdown({ preserveSelection:false });
+  refreshSkuDropdowns({ preserveSelection:false });
+  syncPredictiveFiltersFromMain();
+  const filtered = filterData();
+  setActiveSKUFromFiltered(filtered);
+  renderActiveSKUDetails();
+  updateCharts(filtered);
+  updateSim();
+  loadInterps();
 }
 
 function hasRealPromo(rows = allRows) {
@@ -1340,6 +1445,15 @@ function getSelectedLabel(selectId, fallback = 'Todas') {
   return sel?.selectedOptions?.[0]?.textContent || fallback;
 }
 
+function setDateRangeFromRows(rows) {
+  const dates = rows.map(r => normalizeDateValue(getField(r, 'fecha'))).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  if (!dates.length) return;
+  const from = document.getElementById('date-from');
+  const to = document.getElementById('date-to');
+  from.value = dates[0];
+  to.value = dates[dates.length - 1];
+}
+
 // Listener del input de archivo
 document.getElementById('csv-file-input').addEventListener('change', function(e) {
   const file = e.target.files[0];
@@ -1354,6 +1468,7 @@ document.getElementById('csv-file-input').addEventListener('change', function(e)
       SKUS    = buildSKUsFromRows(allRows);
       if (SKUS.length === 0) throw new Error('No se encontraron SKUs válidos en el archivo.');
       csvLoaded = true;
+      setDateRangeFromRows(allRows);
       populateFilters(SKUS);
       document.getElementById('csv-status').innerHTML =
         `<span class="csv-ok">✅ ${file.name} · ${SKUS.length} SKUs · ${allRows.length.toLocaleString('es-MX')} filas</span>`;
@@ -1538,16 +1653,22 @@ function updateCharts(filtered) {
   /* ── Chart 3: Temporal ── */
   let tempLabels, tempData;
   if (csvLoaded && rows.length > 0) {
-    const sorted = [...rows].sort((a,b) =>
-      normalizeDateValue(getField(a, 'fecha')) < normalizeDateValue(getField(b, 'fecha')) ? -1 : 1);
-    const chunkSz = Math.max(1, Math.floor(sorted.length / 9));
-    const avgs = Array.from({length:9}, (_,i) => {
-      const ch = sorted.slice(i*chunkSz, (i+1)*chunkSz);
-      return ch.reduce((s,r) => s+(parseNumber(getField(r, 'unidades'))||0), 0) / (ch.length||1);
+    const byMonth = {};
+    rows.forEach(r => {
+      const d = normalizeDateValue(getField(r, 'fecha'));
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+      const key = d.slice(0, 7);
+      byMonth[key] = (byMonth[key] || 0) + (parseNumber(getField(r, 'unidades')) || 0);
     });
-    const base = avgs[0] || 1;
-    tempData   = avgs.map(v => Math.round(v/base*100));
-    tempLabels = TEMPORAL_MOCK.labels;
+    const keys = Object.keys(byMonth).sort();
+    const shown = keys.length > 14 ? keys.slice(-14) : keys;
+    const vals = shown.map(k => byMonth[k]);
+    const base = vals[0] || 1;
+    tempData = vals.map(v => Math.round(v / base * 100));
+    tempLabels = shown.map(k => {
+      const [y,m] = k.split('-');
+      return `${m}/${String(y).slice(2)}`;
+    });
   } else {
     const avgE = skus.reduce((a,s)=>a+s.e,0) / (skus.length||1);
     tempData   = TEMPORAL_MOCK.data.map((v,i) =>
@@ -1571,7 +1692,11 @@ function switchView(v) {
   document.getElementById('vista2').style.display = v === 'vista2' ? 'block' : 'none';
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.querySelector(`[data-view="${v}"]`).classList.add('active');
-  if (v === 'vista2') requestAnimationFrame(() => updateSim());
+  if (v === 'vista2') requestAnimationFrame(() => {
+    syncPredictiveFiltersFromMain();
+    updateSim();
+    ['impact','curve'].forEach(k => charts[k]?.resize?.());
+  });
 }
 
 /* ── UI helpers ─────────────────────────────────────────── */
@@ -1631,6 +1756,7 @@ function applyFilters() {
     refreshSkuDropdowns({ preserveSelection:true });
     lastCatValue = cat;
   }
+  syncPredictiveFiltersFromMain();
   const filtered = filterData();
   setActiveSKUFromFiltered(filtered);
   renderActiveSKUDetails();
@@ -1911,6 +2037,8 @@ function updateSim() {
   document.getElementById('traffic-r2').textContent = isFinite(activeSKU.r2) ? `R2 ${activeSKU.r2.toFixed(2)}` : 'R2 --';
   document.getElementById('traffic-n').textContent = isFinite(activeSKU.nObs) ? `n ${activeSKU.nObs}` : 'n --';
   document.getElementById('traffic-beta').textContent = isFinite(e) ? `Beta ${Number(e).toFixed(2)}` : 'Beta --';
+  renderResultCards({ Q, Qsim, Rbase, Rsim, Mbase, Msim, dS, dR, dM, lvl, fmtN, fmtM });
+  renderForecastCharts({ P, C, Q, e:effectiveE, season, period, Rbase, Mbase, dS, dR, dM });
   renderScenarioInterpretation({ disc, season, period, P, Pn, Q, Qsim, Rsim, Msim, dS, dR, dM, quality, lvl });
 
   console.debug('[PromoIntel] Predictive simulation', {
@@ -1925,6 +2053,80 @@ function updateSim() {
 
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(()=>refreshQwenV2(disc,Pn,dS,dM,season), 900);
+}
+
+function renderResultCards({ Q, Qsim, Rbase, Rsim, Mbase, Msim, dS, dR, dM, lvl, fmtN, fmtM }) {
+  const incRevenue = Rsim - Rbase;
+  const incMargin = Msim - Mbase;
+  const incUnits = Qsim - Q;
+  const action = lvl === 'high' && dM >= 0 && dR >= 0
+    ? 'Ejecutar prueba'
+    : lvl === 'high' && dR >= 0
+      ? 'Cuidar margen'
+      : lvl === 'med'
+        ? 'Validar'
+        : 'No automatizar';
+  document.getElementById('res-inc').textContent = fmtM(incRevenue);
+  document.getElementById('res-inc-d').textContent = `${dR >= 0 ? '+' : ''}${dR.toFixed(1)}% vs base`;
+  document.getElementById('res-margin').textContent = fmtM(incMargin);
+  document.getElementById('res-margin-d').textContent = `${dM >= 0 ? '+' : ''}${dM.toFixed(1)}% vs base`;
+  document.getElementById('res-units').textContent = fmtN(incUnits);
+  document.getElementById('res-units-d').textContent = `${dS >= 0 ? '+' : ''}${dS.toFixed(1)}% demanda`;
+  document.getElementById('res-action').textContent = action;
+  document.getElementById('res-action-d').textContent =
+    action === 'Ejecutar prueba' ? 'Escenario favorable con semaforo alto.' :
+    action === 'Cuidar margen' ? 'Ingresos suben, pero margen requiere revision.' :
+    action === 'Validar' ? 'Resultado util, falta evidencia estadistica.' :
+    'Usar solo como exploracion, no decision final.';
+}
+
+function ensureForecastCharts() {
+  if (document.getElementById('vista2')?.style.display === 'none') return;
+  const impactEl = document.getElementById('chart-impact');
+  const curveEl = document.getElementById('chart-curve');
+  if (impactEl && !charts.impact) {
+    charts.impact = new Chart(impactEl.getContext('2d'), {
+      type:'bar',
+      data:{labels:['Unidades','Ingresos','Margen'],datasets:[{label:'Cambio vs base',data:[0,0,0],backgroundColor:['#4a74cc','#00A86B','#F5A623'],borderRadius:6}]},
+      options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw>=0?'+':''}${c.raw.toFixed(1)}%`}}},scales:{y:{ticks:{callback:v=>`${v}%`},grid:{color:'#f0f0f0'}},x:{grid:{display:false}}}}
+    });
+  }
+  if (curveEl && !charts.curve) {
+    charts.curve = new Chart(curveEl.getContext('2d'), {
+      type:'line',
+      data:{labels:[],datasets:[
+        {label:'Ingresos',data:[],borderColor:'#00A86B',backgroundColor:'rgba(0,168,107,.08)',tension:.35,fill:true,pointRadius:3},
+        {label:'Margen',data:[],borderColor:'#E53935',backgroundColor:'rgba(229,57,53,.06)',tension:.35,fill:false,pointRadius:3}
+      ]},
+      options:{responsive:true,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw>=0?'+':''}${c.raw.toFixed(1)}%`}}},scales:{y:{ticks:{callback:v=>`${v}%`},grid:{color:'#f0f0f0'}},x:{title:{display:true,text:'Descuento'},grid:{display:false}}}}
+    });
+  }
+}
+
+function renderForecastCharts({ P, C, Q, e, season, period, Rbase, Mbase, dS, dR, dM }) {
+  ensureForecastCharts();
+  if (charts.impact) {
+    charts.impact.data.datasets[0].data = [dS, dR, dM];
+    charts.impact.data.datasets[0].backgroundColor = [dS >= 0 ? '#4a74cc' : '#E53935', dR >= 0 ? '#00A86B' : '#E53935', dM >= 0 ? '#F5A623' : '#E53935'];
+    charts.impact.update('active');
+  }
+  if (charts.curve) {
+    const discounts = [0,5,10,15,20,25,30,35,40];
+    const revenue = [];
+    const margin = [];
+    discounts.forEach(d => {
+      const pn = P * (1 - d/100);
+      const qn = Q * Math.pow(pn/P, e) * season;
+      const r = pn * qn * period;
+      const m = (pn - C) * qn * period;
+      revenue.push(((r - Rbase) / Rbase) * 100);
+      margin.push(((m - Mbase) / Mbase) * 100);
+    });
+    charts.curve.data.labels = discounts.map(d => `${d}%`);
+    charts.curve.data.datasets[0].data = revenue;
+    charts.curve.data.datasets[1].data = margin;
+    charts.curve.update('active');
+  }
 }
 
 function setList(id, items) {
@@ -2043,7 +2245,7 @@ function exportCSV() {
     'Ventas Simuladas','Ingresos Simulados','Margen Simulado','Elasticidad','Temporada']];
   SKUS.forEach(s => {
     const Pn = s.price*(1-disc/100);
-    const effectiveE = (!csvLoaded || s.modelUsable) ? s.e : 0;
+    const effectiveE = isFinite(s.e) ? s.e : 0;
     const Qs = s.sales*Math.pow(Pn/s.price,effectiveE)*season;
     rows.push([s.id,s.name,s.price,`${disc}%`,Math.round(Pn),
       Math.round(Qs*period),Math.round(Pn*Qs*period),

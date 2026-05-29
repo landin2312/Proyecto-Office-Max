@@ -113,6 +113,7 @@ Implementacion en el front:
 - Para SKUs de baja confianza, el simulador no debe interpretar la elasticidad como recomendacion automatica.
 - Visualmente, el simulador muestra un semaforo: verde para buena probabilidad, amarillo para proyeccion neutral y rojo para alto riesgo estadistico.
 - El dashboard incluye un interpretador automatico de tarjetas y graficas con lectura ejecutiva, riesgo del modelo, insights, recomendaciones y conclusiones del escenario.
+- La vista predictiva incluye filtros propios de departamento, categoria y SKU, tarjetas incrementales y graficas de comparacion base vs simulado y curva de descuento.
 
 ### Clasificacion De Resultados
 
