@@ -114,6 +114,7 @@ Implementacion en el front:
 - Visualmente, el simulador muestra un semaforo: verde para buena probabilidad, amarillo para proyeccion neutral y rojo para alto riesgo estadistico.
 - El dashboard incluye un interpretador automatico de tarjetas y graficas con lectura ejecutiva, riesgo del modelo, insights, recomendaciones y conclusiones del escenario.
 - La vista predictiva incluye filtros propios de departamento, categoria y SKU, tarjetas incrementales y graficas de comparacion base vs simulado y curva de descuento.
+- La grafica principal de escenarios compara ingresos y utilidad incremental contra el precio actual; se evita tratar las columnas simuladas como promociones reales porque la base no contiene campana, vigencia o mecanica promocional observada.
 
 ### Clasificacion De Resultados
 

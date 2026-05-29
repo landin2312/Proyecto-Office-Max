@@ -478,12 +478,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
   <!-- Sección 1: Ingresos por tipo de promoción -->
   <div class="section-card">
-    <div class="section-title">💰 ¿Qué promociones generan más ingresos?</div>
+    <div class="section-title">💰 ¿Qué escenarios de precio generan ingresos y utilidad?</div>
     <div class="section-body">
       <div class="kpi-sm">
         <div class="val" id="s1-val">+32%</div>
-        <div class="lbl">Incremento de ingresos con la mejor promoción</div>
-        <div class="chg pos">↑ vs sin promoción</div>
+        <div class="lbl">Mejor escenario por utilidad incremental</div>
+        <div class="chg pos">vs precio actual</div>
       </div>
       <div class="chart-wrap"><canvas id="chart-promo" style="max-height:220px"></canvas></div>
       <div class="interp-box">
@@ -1573,6 +1573,51 @@ function clearNoData(chartId) {
 }
 
 // Actualiza las 3 gráficas y KPIs usando chart.update() (sin recrear)
+function rowRevenue(row) {
+  return parseNumber(row.ingresos_reales) || parseNumber(getField(row, 'venta_neta')) || 0;
+}
+function rowUnits(row) {
+  return parseNumber(getField(row, 'unidades')) || 0;
+}
+function rowCost(row) {
+  return parseNumber(getField(row, 'costo')) || 0;
+}
+function rowPrice(row) {
+  return parseNumber(getField(row, 'precio')) || 0;
+}
+function rowBaseMargin(row) {
+  const util = parseNumber(row.utilidad);
+  if (isFinite(util)) return util;
+  return (rowPrice(row) - rowCost(row)) * rowUnits(row);
+}
+function scenarioEffectiveness(rows) {
+  const scenarios = [
+    { label:'Desc. 10%', price:'precio_nuevo_menos_10pct', units:'unidades_sim_menos_10pct', revenue:'ingresos_sim_menos_10pct' },
+    { label:'Desc. 5%',  price:'precio_nuevo_menos_5pct',  units:'unidades_sim_menos_5pct',  revenue:'ingresos_sim_menos_5pct' },
+    { label:'Aum. 5%',   price:'precio_nuevo_mas_5pct',    units:'unidades_sim_mas_5pct',    revenue:'ingresos_sim_mas_5pct' },
+    { label:'Aum. 10%',  price:'precio_nuevo_mas_10pct',   units:'unidades_sim_mas_10pct',   revenue:'ingresos_sim_mas_10pct' }
+  ];
+  const baseRevenue = rows.reduce((s,r) => s + rowRevenue(r), 0) || 1;
+  const baseMargin = rows.reduce((s,r) => s + rowBaseMargin(r), 0) || 1;
+  return scenarios.map(sc => {
+    let revenue = 0, margin = 0, hasScenario = false;
+    rows.forEach(r => {
+      const rev = parseNumber(r[sc.revenue]);
+      const units = parseNumber(r[sc.units]);
+      const price = parseNumber(r[sc.price]);
+      if (isFinite(rev)) { revenue += rev; hasScenario = true; }
+      if (isFinite(units) && isFinite(price)) margin += (price - rowCost(r)) * units;
+    });
+    return {
+      label: sc.label,
+      revenuePct: hasScenario ? ((revenue / baseRevenue) - 1) * 100 : NaN,
+      marginPct: hasScenario ? ((margin / baseMargin) - 1) * 100 : NaN,
+      revenueInc: hasScenario ? revenue - baseRevenue : NaN,
+      marginInc: hasScenario ? margin - baseMargin : NaN
+    };
+  }).filter(x => isFinite(x.revenuePct) || isFinite(x.marginPct));
+}
+
 function updateCharts(filtered) {
   const { skus, rows } = filtered;
 
@@ -1586,7 +1631,7 @@ function updateCharts(filtered) {
   ['chart-promo','chart-scatter','chart-temporal'].forEach(clearNoData);
 
   /* ── Chart 1: Ingresos por tipo de promoción ── */
-  let promoLabels, promoData;
+  let promoLabels, promoData, marginData;
   const promoSelected = document.getElementById('promo-filter').value;
   if (csvLoaded && rows.length > 0) {
     const byPromo = {};
@@ -1627,14 +1672,25 @@ function updateCharts(filtered) {
     promoLabels = PROMO_MOCK.labels;
     promoData   = PROMO_MOCK.data.map(v => parseFloat((v * f).toFixed(1)));
   }
+  if (csvLoaded && rows.length > 0) {
+    const effects = scenarioEffectiveness(rows);
+    if (effects.length) {
+      promoLabels = effects.map(e => e.label);
+      promoData = effects.map(e => parseFloat((e.revenuePct || 0).toFixed(1)));
+      marginData = effects.map(e => parseFloat((e.marginPct || 0).toFixed(1)));
+    }
+  }
+  if (!marginData) {
+    const f = SKUS.length > 0 ? skus.length / SKUS.length : 1;
+    marginData = [6, 4, 8, 11, 3].slice(0, promoLabels.length).map(v => parseFloat((v * f).toFixed(1)));
+  }
   if (charts.promo) {
     charts.promo.data.labels = promoLabels;
     charts.promo.data.datasets[0].data = promoData;
-    charts.promo.data.datasets[0].backgroundColor =
-      promoLabels.map((_,i) => ['#1A2E5A','#2d4a8a','#4a74cc','#7aa3e8','#b8cff5'][i%5]);
+    if (charts.promo.data.datasets[1]) charts.promo.data.datasets[1].data = marginData;
     charts.promo.update('active');
   }
-  const maxInc = promoData.length ? Math.max(...promoData) : 0;
+  const maxInc = marginData.length ? Math.max(...marginData) : 0;
   document.getElementById('s1-val').textContent = `${maxInc>=0?'+':''}${maxInc.toFixed(0)}%`;
 
   /* ── Chart 2: Scatter elasticidad ── */
@@ -1724,7 +1780,7 @@ async function loadInterps() {
 
   ['interp-1','interp-2','interp-3','key-insight'].forEach(setLoading);
 
-  const p1 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el tipo de promoción ${promoLabel} generó un incremento de ${s1Txt} en ingresos vs escenario sin promoción. El SKU más elástico es ${topE?.name||'N/A'} con elasticidad ${topE?.e??'-1.85'}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
+  const p1 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el mejor escenario de precio genera ${s1Txt} de utilidad incremental vs precio actual. El SKU más elástico es ${topE?.name||'N/A'} con elasticidad ${topE?.e??'-1.85'}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
   const r1 = await askQwen(p1);
   if (!r1) setBadge(false);
   setText('interp-1', r1 || MOCK_TEXTS.i1, !r1);
@@ -1780,17 +1836,26 @@ function renderChartPromo() {
     type: 'bar',
     data: {
       labels: PROMO_MOCK.labels,
-      datasets: [{
-        data: PROMO_MOCK.data,
-        backgroundColor: ['#1A2E5A','#2d4a8a','#4a74cc','#7aa3e8','#b8cff5'],
-        borderRadius: 6, borderSkipped: false
-      }]
+      datasets: [
+        {
+          label:'Ingresos',
+          data: PROMO_MOCK.data,
+          backgroundColor: '#1A2E5A',
+          borderRadius: 6, borderSkipped: false
+        },
+        {
+          label:'Utilidad',
+          data: [6,4,8,11,3],
+          backgroundColor: '#00A86B',
+          borderRadius: 6, borderSkipped: false
+        }
+      ]
     },
     options: {
       responsive: true,
       plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: c => `+${c.raw}% vs sin promoción` } }
+        legend: { display: true, position:'bottom' },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw>=0?'+':''}${c.raw}% vs precio actual` } }
       },
       scales: {
         y: { beginAtZero: true, ticks: { callback: v => `+${v}%` }, grid: { color: '#f0f0f0' } },
