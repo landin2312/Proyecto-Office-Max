@@ -59,6 +59,51 @@ El Modelo 1 es el modelo operativo del simulador porque produce mas elasticidade
 
 El Modelo 2 funciona como comprobacion estadistica adicional. Al incluir controles, su R2 promedio sube de `0.3225` a `0.6590` y su R2 mediana sube de `0.1111` a `0.7349`. Esto confirma que las variables adicionales explican mejor la cantidad vendida, aunque el modelo calcula menos ventanas porque necesita mas observaciones para evitar sobreajuste.
 
+### Criterio Minimo De Uso: R2 >= 0.50
+
+Para tomar decisiones con el simulador se define como criterio minimo que la estimacion tenga `R2 >= 0.50`. Un R2 menor a 0.50 indica que el modelo explica menos de la mitad de la variacion observada, por lo que la recomendacion debe considerarse de baja confianza.
+
+| Modelo | Betas calculadas | Betas con R2 >= 0.50 | % con R2 >= 0.50 |
+|---|---:|---:|---:|
+| Modelo 1 | 9924 | 2757 | 27.78% |
+| Modelo 2 | 6889 | 4522 | 65.64% |
+
+| Modelo | Mensual con R2 >= 0.50 | Trimestral con R2 >= 0.50 | Semestral con R2 >= 0.50 |
+|---|---:|---:|---:|
+| Modelo 1 | 578 | 1083 | 1096 |
+| Modelo 2 | 451 | 1643 | 2428 |
+
+Con este criterio, el Modelo 2 es mas fuerte para justificar calidad predictiva. El Modelo 1 se mantiene como lectura base de elasticidad, pero el simulador debe priorizar resultados que cumplan:
+
+```text
+R2 >= 0.50
+n_observaciones >= 8
+beta_precio < 0
+beta_precio >= -5
+```
+
+### Como Mejorar El Modelo 1
+
+El Modelo 1 queda mas bajo porque intenta explicar las unidades vendidas usando solamente el precio. En ventas reales, el precio no es la unica causa de variacion: tambien influyen tienda, mes, marca, disponibilidad, margen, costo y comportamiento por departamento.
+
+Mejoras recomendadas:
+
+| Mejora | Impacto esperado |
+|---|---|
+| Filtrar betas con `R2 >= 0.50` | Evita que el simulador use elasticidades de baja confianza. |
+| Exigir `n_observaciones >= 8` | Reduce regresiones inestables por pocas observaciones. |
+| Excluir betas extremas, por ejemplo `beta < -5` | Evita decisiones basadas en coeficientes causados por poca variacion de precio. |
+| Usar ventanas trimestrales o semestrales cuando mensual sea debil | Aumenta observaciones y estabilidad. |
+| Usar Modelo 2 como fallback | Mejora explicabilidad al controlar tienda, mes, marca, costo y margen. |
+| Crear fallback por subdepartamento o departamento | Permite recomendar cuando un SKU tiene pocos datos. |
+
+Estrategia propuesta para el simulador:
+
+1. Usar beta del SKU si cumple `R2 >= 0.50`, `n_observaciones >= 8` y beta negativa razonable.
+2. Si no cumple, usar Modelo 2 para el mismo SKU y ventana.
+3. Si tampoco cumple, usar una elasticidad agregada por subdepartamento.
+4. Si no hay suficiente evidencia, mostrar "baja confianza" y no recomendar una decision automatica.
+
 ### Clasificacion De Resultados
 
 | Modelo | Elasticos `beta < -1` | Inelasticos `-1 < beta < 0` | Beta positiva / revision |
