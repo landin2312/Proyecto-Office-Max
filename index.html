@@ -428,7 +428,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <span class="filter-label">Departamento</span>
       <select id="dept-filter" onchange="applyFilters()">
         <option value="todos">Todos</option>
-        <option value="papel" selected>Papel</option>
+        <option value="papel">Papel</option>
         <option value="archivo">Archivo y Accesorios</option>
         <option value="carpetas">Carpetas</option>
         <option value="suministros">Suministros de Oficina</option>
@@ -572,7 +572,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
             <label>Departamento</label>
             <select id="v2-dept-filter" onchange="applyPredictiveFilters()">
               <option value="todos">Todos</option>
-              <option value="papel" selected>Papel</option>
+              <option value="papel">Papel</option>
               <option value="archivo">Archivo y Accesorios</option>
               <option value="carpetas">Carpetas</option>
               <option value="suministros">Suministros de Oficina</option>
@@ -885,7 +885,15 @@ let SKUS = [
   { id:'50106204', name:'Marathon Resma 500 Hojas', e:-1.12, sales:12400, price:890,  cost:620,  cat:'Papel Bond',      brand:'Marathon',  dept:'papel', icon:'📄' },
   { id:'50084493', name:'Papel Xerox Ecologico TC', e:-0.74, sales:8700,  price:1050, cost:730,  cat:'Papel Ecológico', brand:'Xerox',     dept:'papel', icon:'♻️' },
   { id:'50091122', name:'Papel Bond 75g Resma',     e:-0.45, sales:6200,  price:750,  cost:520,  cat:'Papel Bond',      brand:'Generic',   dept:'papel', icon:'📋' },
-  { id:'50033841', name:'Papel Reciclado 60g',      e:0.12,  sales:3100,  price:680,  cost:480,  cat:'Papel Reciclado', brand:'EcoOffice', dept:'papel', icon:'🌿' }
+  { id:'50033841', name:'Papel Reciclado 60g',      e:0.12,  sales:3100,  price:680,  cost:480,  cat:'Papel Reciclado', brand:'EcoOffice', dept:'papel', icon:'🌿' },
+  { id:'51011001', name:'Folder carta manila',      e:-1.34, sales:9800,  price:42,   cost:25,   cat:'Folders', brand:'OfficeMax', dept:'carpetas', icon:'📁' },
+  { id:'51011002', name:'Carpeta blanca 1 pulg',    e:-0.88, sales:7400,  price:86,   cost:52,   cat:'Carpetas', brand:'Avery', dept:'carpetas', icon:'🗂️' },
+  { id:'52022001', name:'Caja archivo muerto',      e:-1.56, sales:6900,  price:58,   cost:34,   cat:'Archivo', brand:'Bankers Box', dept:'archivo', icon:'📦' },
+  { id:'52022002', name:'Separadores indice carta', e:-0.62, sales:5400,  price:36,   cost:19,   cat:'Accesorios', brand:'Wilson Jones', dept:'archivo', icon:'🗃️' },
+  { id:'53033001', name:'Boligrafo azul punto medio', e:-1.18, sales:21200, price:12, cost:5, cat:'Escritura', brand:'Bic', dept:'suministros', icon:'🖊️' },
+  { id:'53033002', name:'Notas adhesivas 3x3',      e:-0.51, sales:11800, price:49,   cost:28,   cat:'Notas', brand:'Post-it', dept:'suministros', icon:'📝' },
+  { id:'54044001', name:'Cuaderno profesional raya', e:-1.42, sales:15600, price:64,  cost:38,   cat:'Cuadernos', brand:'Scribe', dept:'escolar', icon:'📓' },
+  { id:'54044002', name:'Colores caja 24 piezas',   e:-0.77, sales:8600,  price:92,   cost:55,   cat:'Arte escolar', brand:'Maped', dept:'escolar', icon:'🎨' }
 ];
 
 const PROMO_MOCK = {
@@ -2337,7 +2345,7 @@ async function sendChat() {
   const dept    = document.getElementById('dept-filter').value.toUpperCase();
   const histStr = chatHistory.map(m=>
     `${m.role==='user'?'Usuario':'PromoIntel'}: ${m.content}`).join('\n');
-  const prompt  = `Eres PromoIntel AI, asistente de pricing para OfficeMax. Departamento activo: ${dept}. SKU seleccionado: ${activeSKU?.name||'N/A'}, elasticidad: ${activeSKU?.e||0}, precio base: $${activeSKU?.price||0}. ${csvLoaded?`CSV cargado con ${SKUS.length} SKUs.`:'Datos demo de 5 SKUs de papel.'}\nHistorial:\n${histStr}\nResponde en español, máximo 3 oraciones, orientado a acción.`;
+  const prompt  = `Eres PromoIntel AI, asistente de pricing para OfficeMax. Departamento activo: ${dept}. SKU seleccionado: ${activeSKU?.name||'N/A'}, elasticidad: ${activeSKU?.e||0}, precio base: $${activeSKU?.price||0}. ${csvLoaded?`CSV cargado con ${SKUS.length} SKUs.`:'Datos demo multidepartamento.'}\nHistorial:\n${histStr}\nResponde en español, máximo 3 oraciones, orientado a acción.`;
   const r = await askQwen(prompt);
   document.getElementById(thinkId)?.remove();
   const reply = r || mockReply(msg);
