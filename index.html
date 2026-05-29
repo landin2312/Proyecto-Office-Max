@@ -228,6 +228,23 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .conf-fill.high{background:var(--green);width:85%}
 .conf-fill.med{background:var(--orange);width:60%}
 .conf-fill.low{background:var(--red);width:30%}
+.traffic-card{margin-top:12px;border:1px solid #eee;border-radius:8px;padding:12px;background:#fafafa}
+.traffic-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.traffic-left{display:flex;align-items:center;gap:10px;min-width:0}
+.traffic-light{width:16px;height:16px;border-radius:50%;box-shadow:0 0 0 4px rgba(0,0,0,.04)}
+.traffic-light.high{background:var(--green)}
+.traffic-light.med{background:var(--orange)}
+.traffic-light.low{background:var(--red)}
+.traffic-title{font-size:13px;font-weight:700;color:#222}
+.traffic-tag{font-size:11px;font-weight:700;padding:4px 8px;border-radius:999px}
+.traffic-tag.high{background:rgba(0,168,107,.12);color:var(--green)}
+.traffic-tag.med{background:rgba(245,166,35,.15);color:#a65f00}
+.traffic-tag.low{background:rgba(229,57,53,.12);color:var(--red)}
+.traffic-detail{font-size:12px;color:#666;line-height:1.45}
+.traffic-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.traffic-metric{background:#fff;border:1px solid #eee;border-radius:6px;padding:8px}
+.traffic-metric b{display:block;font-size:12px;color:#222;margin-bottom:2px}
+.traffic-metric span{font-size:11px;color:#777}
 
 /* Qwen V2 */
 .qwen-box{background:#F8F7FF;border-radius:10px;padding:14px;border-left:3px solid var(--purple)}
@@ -672,6 +689,23 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
           <span id="conf-lbl" style="font-weight:700;color:var(--green)">Alta</span>
         </div>
         <div class="conf-track"><div class="conf-fill high" id="conf-fill"></div></div>
+        <div class="traffic-card" id="traffic-card">
+          <div class="traffic-head">
+            <div class="traffic-left">
+              <span class="traffic-light high" id="traffic-light"></span>
+              <div>
+                <div class="traffic-title" id="traffic-title">Buena probabilidad</div>
+                <div class="traffic-detail" id="traffic-detail">La proyeccion cumple el criterio minimo del modelo.</div>
+              </div>
+            </div>
+            <span class="traffic-tag high" id="traffic-tag">VERDE</span>
+          </div>
+          <div class="traffic-metrics">
+            <div class="traffic-metric"><b id="traffic-r2">R2 --</b><span>Calidad de ajuste</span></div>
+            <div class="traffic-metric"><b id="traffic-n">n --</b><span>Observaciones</span></div>
+            <div class="traffic-metric"><b id="traffic-beta">Beta --</b><span>Elasticidad</span></div>
+          </div>
+        </div>
       </div>
 
       <!-- Justificación Qwen -->
@@ -695,7 +729,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       Permite simular impacto de cambios de precio en tiempo real y optimizar estrategias de descuento por temporada, categoría y canal.</p>
     <table class="sku-tbl">
       <thead>
-        <tr><th>SKU</th><th>Nombre</th><th>Elasticidad</th><th>Clasificación</th><th>Ventas prom.</th></tr>
+        <tr><th>SKU</th><th>Nombre</th><th>Elasticidad</th><th>Semaforo</th><th>Clasificación</th><th>Ventas prom.</th></tr>
       </thead>
       <tbody id="sku-tbl-body"></tbody>
     </table>
@@ -983,12 +1017,35 @@ function isUsableModel({ e, r2, n }) {
     n >= MODEL_RULES.minObs;
 }
 function modelQuality(sku) {
-  const usable = isUsableModel({ e: sku?.e, r2: sku?.r2, n: sku?.nObs });
-  if (usable) return { lvl:'high', label:'Alta', reason:`R2 ${sku.r2.toFixed(2)} | n=${sku.nObs}` };
-  if (isFinite(sku?.r2) || isFinite(sku?.nObs)) {
-    return { lvl:'low', label:'Baja', reason:`No cumple R2 >= ${MODEL_RULES.minR2.toFixed(2)} y n >= ${MODEL_RULES.minObs}` };
+  const e = Number(sku?.e);
+  const r2 = Number(sku?.r2);
+  const n = Number(sku?.nObs);
+  const betaOk = isFinite(e) && e < MODEL_RULES.maxBeta && e >= MODEL_RULES.minBeta;
+  const r2Ok = isFinite(r2) && r2 >= MODEL_RULES.minR2;
+  const nOk = isFinite(n) && n >= MODEL_RULES.minObs;
+  if (betaOk && r2Ok && nOk) {
+    return {
+      lvl:'high',
+      label:'Buena probabilidad',
+      tag:'VERDE',
+      reason:`Cumple R2 >= ${MODEL_RULES.minR2.toFixed(2)}, n >= ${MODEL_RULES.minObs} y beta razonable.`
+    };
   }
-  return { lvl:'low', label:'Baja', reason:'Sin R2/n para validar el modelo' };
+  const partial = betaOk && ((isFinite(r2) && r2 >= 0.35) || (isFinite(n) && n >= 5));
+  if (partial) {
+    return {
+      lvl:'med',
+      label:'Proyeccion neutral',
+      tag:'AMARILLO',
+      reason:'La proyeccion se muestra, pero falta fuerza estadistica para usarla como decision automatica.'
+    };
+  }
+  return {
+    lvl:'low',
+    label:'Riesgo alto',
+    tag:'ROJO',
+    reason:'La proyeccion tiene baja evidencia; revisar otro SKU, otra ventana o un agregado por subdepartamento.'
+  };
 }
 function selectBestModelRow(rows) {
   const candidates = rows.map(r => {
@@ -1740,8 +1797,7 @@ function updateSim() {
 
   const { price:P, cost:C, sales:Q, e } = activeSKU;
   const quality = modelQuality(activeSKU);
-  const canUseElasticity = !csvLoaded || activeSKU.modelUsable;
-  const effectiveE = canUseElasticity ? e : 0;
+  const effectiveE = isFinite(e) ? e : 0;
   const scenario = getScenarioProjection(activeSKU, disc, season);
   const Pn    = scenario?.p || P * (1 - disc/100);
   const Qsim  = scenario?.q || Q * Math.pow(Pn/P, effectiveE) * season;
@@ -1792,10 +1848,18 @@ function updateSim() {
 
   const lvl = csvLoaded ? quality.lvl : (Math.abs(e)>1.3?'high':Math.abs(e)>0.5?'med':'low');
   document.getElementById('conf-lbl').textContent =
-    csvLoaded ? `${quality.label} · ${quality.reason}` : {high:'Alta',med:'Media',low:'Baja'}[lvl];
+    csvLoaded ? quality.tag : {high:'Alta',med:'Media',low:'Baja'}[lvl];
   document.getElementById('conf-lbl').style.color  =
     {high:'var(--green)',med:'var(--orange)',low:'var(--red)'}[lvl];
   document.getElementById('conf-fill').className   = `conf-fill ${lvl}`;
+  document.getElementById('traffic-light').className = `traffic-light ${lvl}`;
+  document.getElementById('traffic-tag').className = `traffic-tag ${lvl}`;
+  document.getElementById('traffic-tag').textContent = csvLoaded ? quality.tag : ({high:'VERDE',med:'AMARILLO',low:'ROJO'}[lvl]);
+  document.getElementById('traffic-title').textContent = csvLoaded ? quality.label : ({high:'Buena probabilidad',med:'Proyeccion neutral',low:'Riesgo alto'}[lvl]);
+  document.getElementById('traffic-detail').textContent = csvLoaded ? quality.reason : 'Modo demo: el semaforo se basa en la elasticidad del SKU.';
+  document.getElementById('traffic-r2').textContent = isFinite(activeSKU.r2) ? `R2 ${activeSKU.r2.toFixed(2)}` : 'R2 --';
+  document.getElementById('traffic-n').textContent = isFinite(activeSKU.nObs) ? `n ${activeSKU.nObs}` : 'n --';
+  document.getElementById('traffic-beta').textContent = isFinite(e) ? `Beta ${Number(e).toFixed(2)}` : 'Beta --';
 
   console.debug('[PromoIntel] Predictive simulation', {
     sku: activeSKU.id,
@@ -1828,10 +1892,12 @@ async function refreshQwenV2(disc, Pn, dSales, dMargin, season) {
 function renderSKUTable() {
   document.getElementById('sku-tbl-body').innerHTML = SKUS.map(s => {
     const {cls, lbl} = classifyE(s.e);
+    const q = modelQuality(s);
     return `<tr>
       <td><code>${s.id}</code></td>
       <td>${s.name}</td>
       <td><span class="e-badge ${cls}">${s.e}</span></td>
+      <td><span class="traffic-tag ${q.lvl}">${q.tag}</span></td>
       <td>${lbl}</td>
       <td>${Math.round(s.sales).toLocaleString('es-MX')} u.</td>
     </tr>`;
