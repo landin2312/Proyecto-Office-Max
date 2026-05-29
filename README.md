@@ -155,19 +155,31 @@ El resultado esperado es un simulador que apoye decisiones de pricing y promocio
 
 ### 2. Entendimiento De Los Datos
 
-Se revisaron fuentes historicas de ventas, precios, catalogo, costos y promociones. Para la entrega final se uso la base limpia `Base_OfficeMax19mayo.csv`, porque contiene las variables necesarias para estimar elasticidad de forma consistente:
+Se revisaron fuentes historicas de ventas, precios, catalogo, costos y promociones. La base oficial actual es `BASE_FINAL_OM - Oficial.csv`, con **26,980 filas x 58 columnas** a nivel linea de ticket por SKU, tienda y fecha. La llave operativa mas cercana es:
 
-- SKU (`prod_nbr`)
+```text
+store_nbr + tran_date + tran_nbr + sku
+```
+
+La base contiene las variables necesarias para estimar y simular elasticidad de forma consistente:
+
+- SKU (`sku`)
 - tienda (`store_nbr`)
+- nombre de tienda (`store_nm`)
 - fecha de venta (`tran_date`)
-- unidades vendidas (`qty`)
-- precio (`precio`)
-- venta neta (`net_sale`)
+- numero de ticket (`tran_nbr`)
+- unidades vendidas (`unidades`)
+- precio observado real (`precio_real`)
+- precio listado (`precio`)
+- venta neta (`venta_neta`)
 - margen (`margen`)
-- costo unitario calculado
-- departamento, subdepartamento, clase, marca y tipo de marca
+- costo unitario calculado (`costo_calculado`)
+- utilidad (`utilidad`)
+- departamento, subdepartamento, clase, proveedor, marca y tipo de marca
 
-La base oficial de modelado se agrego a granularidad `SKU x tienda x mes`. Esta granularidad permite que una ventana mensual tenga varias observaciones por tiendas, evitando que el modelo quede con una sola observacion por SKU-mes.
+La variable recomendada de precio es `precio_real`, porque coincide con `venta_neta / unidades`. No se recomienda usar `precio` como variable principal porque en 12,445 filas difiere del precio efectivamente pagado por mas de 0.02.
+
+La base tambien contiene columnas de escenarios simulados (`precio_nuevo_*`, `unidades_sim_*`, `ingresos_sim_*`) y outputs de modelos previos (`beta_utilizada`, `alpha`, `r2`, `n_observaciones`, `clasificacion_elasticidad`). Estas columnas pueden usarse para el dashboard y validacion, pero deben excluirse del entrenamiento de un modelo nuevo para evitar fuga de informacion.
 
 ### 3. Preparacion De Datos
 
@@ -180,15 +192,24 @@ Transformaciones principales:
 - Limpieza y conversion de variables numericas.
 - Conversion de `tran_date` a periodo mensual.
 - Filtrado de registros con unidades y precio validos.
-- Calculo de `precio_real = net_sale / unidades`, usando `precio_promedio` como respaldo.
-- Agregacion a `SKU x tienda x mes`.
+- Uso de `precio_real = venta_neta / unidades` como precio observado.
+- Agregacion recomendada a `SKU x tienda x semana` para reducir ruido de ticket individual.
+- Agregacion alternativa a `SKU x tienda x fecha` cuando exista suficiente volumen.
 - Creacion de ventanas moviles:
   - mensual: 1 mes
   - trimestral: 3 meses
   - semestral: 6 meses
 - Exclusion de ventanas no modelables por `n<3`, precio constante, unidades constantes o exceso de controles frente al numero de observaciones.
 
-Variables de promocion como `indicador_promocion`, `descuento_pct` y `tipo_promo` no se incluyeron en la base final porque no existen dentro de `Base_OfficeMax19mayo.csv`. Para evitar mezclar bases, la entrega final se mantiene solamente con esa fuente.
+Variables que deben excluirse del entrenamiento:
+
+- Simulaciones: `precio_nuevo_*`, `unidades_sim_*`, `ingresos_sim_*`.
+- Outputs previos: `beta_utilizada`, `alpha`, `r2`, `n_observaciones`, `clasificacion_elasticidad`.
+- Columnas ambiguas: `-10%_dup`, `-5%_dup`, `5%_dup`, `10%_dup`.
+- Constantes: `bl` y `mess_unit`.
+- Redundante: `ingresos_reales`, si ya se usa `venta_neta`.
+
+Variables de promocion real como campana, vigencia, cupon o mecanica promocional no existen en la base oficial. Por eso el modelo mide sensibilidad precio-demanda y no efecto causal completo de promocion.
 
 ### 4. Modelado
 
@@ -227,13 +248,16 @@ Controles usados cuando existen y tienen variacion suficiente:
 - margen
 - `log(costo_unitario)`
 - fechas de venta
-- mes
-- tienda
+- semana, mes, dia de semana y temporada derivadas de `tran_date`
+- tienda (`store_nbr` / `store_nm`)
 - marca
 - tipo de marca
 - departamento
 - subdepartamento
 - clase
+- proveedor (`vendor_nm`)
+- producto ecologico (`ecologicos`)
+- clasificacion retail y estatus operativo de tienda
 
 Uso principal:
 
