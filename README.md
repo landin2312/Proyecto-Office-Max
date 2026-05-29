@@ -97,12 +97,20 @@ Mejoras recomendadas:
 | Usar Modelo 2 como fallback | Mejora explicabilidad al controlar tienda, mes, marca, costo y margen. |
 | Crear fallback por subdepartamento o departamento | Permite recomendar cuando un SKU tiene pocos datos. |
 
-Estrategia propuesta para el simulador:
+Estrategia operativa del simulador:
 
 1. Usar beta del SKU si cumple `R2 >= 0.50`, `n_observaciones >= 8` y beta negativa razonable.
 2. Si no cumple, usar Modelo 2 para el mismo SKU y ventana.
 3. Si tampoco cumple, usar una elasticidad agregada por subdepartamento.
 4. Si no hay suficiente evidencia, mostrar "baja confianza" y no recomendar una decision automatica.
+
+Implementacion en el front:
+
+- El simulador reconoce columnas `r2`, `n_observaciones`, `modelo` y `tipo_ventana`.
+- Por cada SKU selecciona la mejor beta disponible que cumpla los criterios de calidad.
+- Prioriza estimaciones del modelo con controles cuando existen.
+- Si una beta no cumple `R2 >= 0.50`, `n_observaciones >= 8`, `beta_precio < 0` y `beta_precio >= -5`, la marca como baja confianza.
+- Para SKUs de baja confianza, el simulador no debe interpretar la elasticidad como recomendacion automatica.
 
 ### Clasificacion De Resultados
 

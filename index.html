@@ -760,6 +760,12 @@ let debounceTimer = null;
 const QWEN_MODELS = ['qwen2', 'qwen2:latest', 'qwen2.5', 'qwen2.5:latest'];
 let lastDeptValue = null;
 let lastCatValue = null;
+const MODEL_RULES = {
+  minR2: 0.50,
+  minObs: 8,
+  minBeta: -5,
+  maxBeta: 0
+};
 
 /* ══════════════════════════════════════════════════════════
    ARREGLO 3 — QWEN SIN PING INICIAL
@@ -808,6 +814,10 @@ const COLUMN_ALIASES = {
   precio: ['precio','precio_venta','precio_unitario','precio_promedio','precio_prom','price','unit_price','avg_price','precio_actual','pvp','pv','retail_price'],
   costo: ['costo','cost','unit_cost','costo_unitario','costo_promedio','avg_cost'],
   elasticidad: ['elasticidad','elasticity','beta','beta_utilizada','coeficiente','coef_elasticidad','e'],
+  r2: ['r2','r_2','r_squared','rsquared','coef_determinacion','coeficiente_determinacion'],
+  n_observaciones: ['n_observaciones','observaciones','n_obs','n','n_registros','num_observaciones','sample_size'],
+  modelo: ['modelo','model','tipo_modelo'],
+  tipo_ventana: ['tipo_ventana','ventana','window','periodo_modelo'],
   nombre: ['nombre','nombre_producto','producto','descripcion','descripcion_producto','product_name','product','prod_nm','item_name','sku_name','description'],
   categoria: ['categoria','category','cat','clase','class','class_nm','subcategoria','sub_category','subdepartamento','subdept','subdept_nm','familia','linea'],
   departamento: ['departamento','department','dept','dept_nm','area','division'],
@@ -942,16 +952,64 @@ function parseCSVText(text) {
 }
 
 // Regresión log-log por mínimos cuadrados: devuelve elasticidad (pendiente)
-function estimateElasticityLS(prices, units) {
-  const n = prices.length;
+function estimateElasticityStats(prices, units) {
+  const n = Math.min(prices.length, units.length);
   if (n < 2) return null;
-  const lx = prices.map(p => Math.log(Math.max(p, 0.01)));
-  const ly = units.map(u  => Math.log(u + 1));
+  const lx = prices.slice(0, n).map(p => Math.log(Math.max(p, 0.01)));
+  const ly = units.slice(0, n).map(u  => Math.log(u + 1));
   const mX = lx.reduce((a,b)=>a+b,0)/n;
   const mY = ly.reduce((a,b)=>a+b,0)/n;
   let num = 0, den = 0;
   for (let i = 0; i < n; i++) { num += (lx[i]-mX)*(ly[i]-mY); den += (lx[i]-mX)**2; }
-  return den > 1e-10 ? parseFloat((num/den).toFixed(3)) : null;
+  if (den <= 1e-10) return null;
+  const beta = num / den;
+  const alpha = mY - beta * mX;
+  const pred = lx.map(x => alpha + beta * x);
+  const ssRes = ly.reduce((s, y, i) => s + (y - pred[i]) ** 2, 0);
+  const ssTot = ly.reduce((s, y) => s + (y - mY) ** 2, 0);
+  const r2 = ssTot > 1e-10 ? 1 - ssRes / ssTot : NaN;
+  return { beta: parseFloat(beta.toFixed(3)), r2: parseFloat(r2.toFixed(4)), n };
+}
+function estimateElasticityLS(prices, units) {
+  return estimateElasticityStats(prices, units)?.beta ?? null;
+}
+function isUsableModel({ e, r2, n }) {
+  return isFinite(e) &&
+    e < MODEL_RULES.maxBeta &&
+    e >= MODEL_RULES.minBeta &&
+    isFinite(r2) &&
+    r2 >= MODEL_RULES.minR2 &&
+    isFinite(n) &&
+    n >= MODEL_RULES.minObs;
+}
+function modelQuality(sku) {
+  const usable = isUsableModel({ e: sku?.e, r2: sku?.r2, n: sku?.nObs });
+  if (usable) return { lvl:'high', label:'Alta', reason:`R2 ${sku.r2.toFixed(2)} | n=${sku.nObs}` };
+  if (isFinite(sku?.r2) || isFinite(sku?.nObs)) {
+    return { lvl:'low', label:'Baja', reason:`No cumple R2 >= ${MODEL_RULES.minR2.toFixed(2)} y n >= ${MODEL_RULES.minObs}` };
+  }
+  return { lvl:'low', label:'Baja', reason:'Sin R2/n para validar el modelo' };
+}
+function selectBestModelRow(rows) {
+  const candidates = rows.map(r => {
+    const e = parseNumber(getField(r, 'elasticidad'));
+    const r2 = parseNumber(getField(r, 'r2'));
+    const nObs = parseNumber(getField(r, 'n_observaciones'));
+    const model = String(getField(r, 'modelo', '')).toLowerCase();
+    const windowType = String(getField(r, 'tipo_ventana', '')).toLowerCase();
+    const usable = isUsableModel({ e, r2, n:nObs });
+    const modelScore = model.includes('2') || model.includes('control') ? 2 : 1;
+    const windowScore = windowType.includes('trimestral') ? 3 : windowType.includes('semestral') ? 2 : 1;
+    return { row:r, e, r2, nObs, usable, score:[usable ? 1 : 0, modelScore, r2 || -1, nObs || 0, windowScore] };
+  }).filter(c => isFinite(c.e));
+  if (!candidates.length) return null;
+  candidates.sort((a,b) => {
+    for (let i = 0; i < a.score.length; i++) {
+      if (a.score[i] !== b.score[i]) return b.score[i] - a.score[i];
+    }
+    return 0;
+  });
+  return candidates[0];
 }
 
 // Clasifica una elasticidad → { cls, lbl, color }
@@ -977,9 +1035,17 @@ function buildSKUsFromRows(rows) {
     const units   = sr.map(r => parseNumber(getField(r, 'unidades'))).filter(u => !isNaN(u) && u >= 0);
     const incomes = sr.map(r => parseNumber(getField(r, 'venta_neta'))).filter(v => !isNaN(v));
 
-    const eCSV  = getField(sr[0], 'elasticidad') ? parseNumber(getField(sr[0], 'elasticidad')) : NaN;
-    const eCalc = isFinite(eCSV) ? eCSV : estimateElasticityLS(prices, units);
-    const e     = eCalc ?? -1.0;
+    const bestModel = selectBestModelRow(sr);
+    const stats = bestModel ? null : estimateElasticityStats(prices, units);
+    const eCSV = bestModel?.e ?? NaN;
+    const eCalc = isFinite(eCSV) ? eCSV : stats?.beta;
+    const e = eCalc ?? -1.0;
+    const r2 = bestModel?.r2 ?? stats?.r2 ?? NaN;
+    const nObs = bestModel?.nObs ?? stats?.n ?? sr.length;
+    const modelSource = bestModel
+      ? `${getField(bestModel.row, 'modelo', 'modelo con controles') || 'modelo con controles'} ${getField(bestModel.row, 'tipo_ventana', '')}`.trim()
+      : 'estimado en navegador';
+    const modelUsable = isUsableModel({ e, r2, n:nObs });
 
     const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
     const avgPrice = avg(prices);
@@ -992,7 +1058,8 @@ function buildSKUsFromRows(rows) {
     const brand  = getField(sr[0], 'marca', 'Sin marca');
     const dept   = normText(getField(sr[0], 'departamento', 'sin departamento'));
 
-    return { id, name: nombre, e, sales: avg(units), price: avgPrice,
+    return { id, name: nombre, e, r2, nObs, modelSource, modelUsable,
+             sales: avg(units), price: avgPrice,
              cost, cat, brand, dept, icon: '📦', rawRows: sr };
   });
 }
@@ -1598,7 +1665,9 @@ function renderActiveSKUDetails() {
   document.getElementById('prod-detail').textContent = `${activeSKU.cat} · ${activeSKU.brand} · ST`;
 
   const { lbl, color } = classifyE(activeSKU.e);
-  document.getElementById('prod-elast').textContent  = `Elasticidad: ${activeSKU.e} · ${lbl}`;
+  const quality = modelQuality(activeSKU);
+  const r2Txt = isFinite(activeSKU.r2) ? `R2: ${activeSKU.r2.toFixed(2)} · n=${activeSKU.nObs}` : 'R2 no disponible';
+  document.getElementById('prod-elast').textContent  = `Elasticidad: ${activeSKU.e} · ${lbl} · ${quality.label} (${r2Txt})`;
   document.getElementById('prod-elast').style.color  = color;
 }
 
@@ -1670,9 +1739,12 @@ function updateSim() {
   if (!activeSKU) return;
 
   const { price:P, cost:C, sales:Q, e } = activeSKU;
+  const quality = modelQuality(activeSKU);
+  const canUseElasticity = !csvLoaded || activeSKU.modelUsable;
+  const effectiveE = canUseElasticity ? e : 0;
   const scenario = getScenarioProjection(activeSKU, disc, season);
   const Pn    = scenario?.p || P * (1 - disc/100);
-  const Qsim  = scenario?.q || Q * Math.pow(Pn/P, e) * season;
+  const Qsim  = scenario?.q || Q * Math.pow(Pn/P, effectiveE) * season;
   const Rsim  = (scenario?.r || Pn * Qsim) * period;
   const Msim  = (Pn - C) * Qsim * period;
   const Rbase = P * Q * period;
@@ -1710,7 +1782,7 @@ function updateSim() {
 
   const steps=5, ss=[],sr=[],sm=[];
   for(let i=0;i<=steps;i++){
-    const d=(disc/steps)*i, proj=getScenarioProjection(activeSKU,d,season), pn=proj?.p || P*(1-d/100), qn=proj?.q || Q*Math.pow(pn/P,e)*season;
+    const d=(disc/steps)*i, proj=getScenarioProjection(activeSKU,d,season), pn=proj?.p || P*(1-d/100), qn=proj?.q || Q*Math.pow(pn/P,effectiveE)*season;
     ss.push(qn); sr.push(proj?.r || pn*qn); sm.push((pn-C)*qn);
   }
   renderSpark('sp-ventas',ss,dS>=0?'#00A86B':'#E53935');
@@ -1718,10 +1790,9 @@ function updateSim() {
   renderSpark('sp-dem',   ss,dS>=0?'#00A86B':'#E53935');
   renderSpark('sp-margen',sm,dM>=0?'#00A86B':'#E53935');
 
-  const ae=Math.abs(e);
-  const lvl=ae>1.3?'high':ae>0.5?'med':'low';
+  const lvl = csvLoaded ? quality.lvl : (Math.abs(e)>1.3?'high':Math.abs(e)>0.5?'med':'low');
   document.getElementById('conf-lbl').textContent =
-    {high:'Alta',med:'Media',low:'Baja'}[lvl];
+    csvLoaded ? `${quality.label} · ${quality.reason}` : {high:'Alta',med:'Media',low:'Baja'}[lvl];
   document.getElementById('conf-lbl').style.color  =
     {high:'var(--green)',med:'var(--orange)',low:'var(--red)'}[lvl];
   document.getElementById('conf-fill').className   = `conf-fill ${lvl}`;
@@ -1776,7 +1847,8 @@ function exportCSV() {
     'Ventas Simuladas','Ingresos Simulados','Margen Simulado','Elasticidad','Temporada']];
   SKUS.forEach(s => {
     const Pn = s.price*(1-disc/100);
-    const Qs = s.sales*Math.pow(Pn/s.price,s.e)*season;
+    const effectiveE = (!csvLoaded || s.modelUsable) ? s.e : 0;
+    const Qs = s.sales*Math.pow(Pn/s.price,effectiveE)*season;
     rows.push([s.id,s.name,s.price,`${disc}%`,Math.round(Pn),
       Math.round(Qs*period),Math.round(Pn*Qs*period),
       Math.round((Pn-s.cost)*Qs*period),s.e,season]);
