@@ -112,6 +112,7 @@ Implementacion en el front:
 - Si una beta no cumple `R2 >= 0.50`, `n_observaciones >= 8`, `beta_precio < 0` y `beta_precio >= -5`, la marca como baja confianza.
 - Para SKUs de baja confianza, el simulador no debe interpretar la elasticidad como recomendacion automatica.
 - Visualmente, el simulador muestra un semaforo: verde para buena probabilidad, amarillo para proyeccion neutral y rojo para alto riesgo estadistico.
+- El dashboard incluye un interpretador automatico de tarjetas y graficas con lectura ejecutiva, riesgo del modelo, insights, recomendaciones y conclusiones del escenario.
 
 ### Clasificacion De Resultados
 

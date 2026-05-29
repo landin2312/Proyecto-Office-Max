@@ -251,6 +251,20 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .qwen-hdr{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
   color:var(--purple);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
 .qwen-txt{font-size:12px;color:#444;line-height:1.6;font-style:italic}
+.ai-brief{background:#fff;border:1px solid #eceff5;border-radius:10px;padding:14px;box-shadow:var(--shadow)}
+.ai-brief h3{font-size:13px;font-weight:700;margin-bottom:10px;color:#222}
+.ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ai-card{border:1px solid #edf0f5;border-radius:8px;padding:10px;background:#fbfcff}
+.ai-card b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#1A2E5A;margin-bottom:6px}
+.ai-card p{font-size:12px;color:#4b5563;line-height:1.45}
+.ai-card.full{grid-column:1/-1}
+.ai-list{margin:0;padding-left:16px}
+.ai-list li{font-size:12px;color:#4b5563;line-height:1.45;margin-bottom:4px}
+.ai-pill-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ai-pill{font-size:11px;font-weight:700;border-radius:999px;padding:4px 8px;background:#eef2ff;color:#1A2E5A}
+.ai-pill.good{background:rgba(0,168,107,.12);color:var(--green)}
+.ai-pill.warn{background:rgba(245,166,35,.15);color:#a65f00}
+.ai-pill.risk{background:rgba(229,57,53,.12);color:var(--red)}
 
 /* Export */
 .export-btn{
@@ -716,6 +730,25 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
       </div>
 
+      <div class="ai-brief">
+        <h3>Interpretador de tarjetas y graficas</h3>
+        <div class="ai-grid">
+          <div class="ai-card full">
+            <b>Lectura ejecutiva</b>
+            <p id="ai-summary">Selecciona un SKU y ajusta el descuento para generar una interpretacion del escenario.</p>
+            <div class="ai-pill-row" id="ai-pills"></div>
+          </div>
+          <div class="ai-card">
+            <b>Lectura de graficas</b>
+            <p id="ai-chart-read">Las lineas pequenas comparan la trayectoria esperada de ventas, ingresos, demanda y margen.</p>
+          </div>
+          <div class="ai-card">
+            <b>Riesgo del modelo</b>
+            <p id="ai-risk">El semaforo combina R2, observaciones y beta para indicar si la proyeccion es confiable.</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Exportar -->
       <button class="export-btn" onclick="exportCSV()">⬇️ Exportar resultados a CSV</button>
 
@@ -733,6 +766,24 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       </thead>
       <tbody id="sku-tbl-body"></tbody>
     </table>
+  </div>
+
+  <div class="solution-card">
+    <h3>Insights, recomendaciones y conclusiones</h3>
+    <div class="ai-grid">
+      <div class="ai-card">
+        <b>Insights</b>
+        <ul class="ai-list" id="ai-insights"></ul>
+      </div>
+      <div class="ai-card">
+        <b>Recomendaciones</b>
+        <ul class="ai-list" id="ai-recommendations"></ul>
+      </div>
+      <div class="ai-card full">
+        <b>Conclusiones</b>
+        <p id="ai-conclusions">Las conclusiones se actualizan con base en el SKU, descuento, margen y semaforo del modelo.</p>
+      </div>
+    </div>
   </div>
 
 </div><!-- /vista2 -->
@@ -1860,6 +1911,7 @@ function updateSim() {
   document.getElementById('traffic-r2').textContent = isFinite(activeSKU.r2) ? `R2 ${activeSKU.r2.toFixed(2)}` : 'R2 --';
   document.getElementById('traffic-n').textContent = isFinite(activeSKU.nObs) ? `n ${activeSKU.nObs}` : 'n --';
   document.getElementById('traffic-beta').textContent = isFinite(e) ? `Beta ${Number(e).toFixed(2)}` : 'Beta --';
+  renderScenarioInterpretation({ disc, season, period, P, Pn, Q, Qsim, Rsim, Msim, dS, dR, dM, quality, lvl });
 
   console.debug('[PromoIntel] Predictive simulation', {
     sku: activeSKU.id,
@@ -1873,6 +1925,84 @@ function updateSim() {
 
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(()=>refreshQwenV2(disc,Pn,dS,dM,season), 900);
+}
+
+function setList(id, items) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = '';
+  items.forEach(item => {
+    const li = document.createElement('li');
+    li.textContent = item;
+    el.appendChild(li);
+  });
+}
+function setPills(items) {
+  const el = document.getElementById('ai-pills');
+  if (!el) return;
+  el.innerHTML = '';
+  items.forEach(({ text, cls }) => {
+    const span = document.createElement('span');
+    span.className = `ai-pill ${cls || ''}`.trim();
+    span.textContent = text;
+    el.appendChild(span);
+  });
+}
+function renderScenarioInterpretation({ disc, season, period, P, Pn, Q, Qsim, Rsim, Msim, dS, dR, dM, quality, lvl }) {
+  const sku = activeSKU;
+  if (!sku) return;
+  const elastic = sku.e < -1;
+  const marginRisk = dM < -5;
+  const revenueGood = dR > 3;
+  const demandGood = dS > 3;
+  const confidenceWord = quality?.tag || ({high:'VERDE',med:'AMARILLO',low:'ROJO'}[lvl] || 'N/A');
+  const actionTone = lvl === 'high' ? 'se puede considerar como escenario accionable' : lvl === 'med' ? 'sirve como referencia, pero requiere validacion adicional' : 'debe tomarse solo como alerta exploratoria';
+
+  document.getElementById('ai-summary').textContent =
+    `${sku.name} proyecta ${demandGood ? 'mayor demanda' : dS < -3 ? 'menor demanda' : 'demanda estable'} con ${disc}% de descuento. ` +
+    `El ingreso cambia ${dR >= 0 ? '+' : ''}${dR.toFixed(1)}% y el margen ${dM >= 0 ? '+' : ''}${dM.toFixed(1)}%; con semaforo ${confidenceWord}, ${actionTone}.`;
+
+  document.getElementById('ai-chart-read').textContent =
+    `Las tarjetas muestran una trayectoria de ${Math.round(Q).toLocaleString('es-MX')} a ${Math.round(Qsim).toLocaleString('es-MX')} unidades. ` +
+    `${revenueGood ? 'La grafica de ingresos acompana el aumento de demanda.' : 'La grafica de ingresos no muestra suficiente compensacion frente al cambio de precio.'} ` +
+    `${marginRisk ? 'La linea de margen es el principal punto de cuidado.' : 'El margen no muestra una caida critica en este escenario.'}`;
+
+  document.getElementById('ai-risk').textContent =
+    `${quality.reason} R2 ${isFinite(sku.r2) ? sku.r2.toFixed(2) : 'no disponible'}, n ${isFinite(sku.nObs) ? sku.nObs : 'no disponible'}, beta ${isFinite(sku.e) ? Number(sku.e).toFixed(2) : 'no disponible'}.`;
+
+  setPills([
+    { text: `Semaforo ${confidenceWord}`, cls: lvl === 'high' ? 'good' : lvl === 'med' ? 'warn' : 'risk' },
+    { text: `${disc}% descuento`, cls: disc > 20 ? 'warn' : '' },
+    { text: `${period} semanas`, cls: '' },
+    { text: elastic ? 'SKU elastico' : 'SKU no elastico', cls: elastic ? 'good' : 'warn' }
+  ]);
+
+  const insights = [
+    `La elasticidad estimada es ${Number(sku.e).toFixed(2)}, por lo que el SKU ${elastic ? 'responde fuerte a cambios de precio' : 'responde de forma moderada o baja al precio'}.`,
+    `La proyeccion mueve el precio de $${Math.round(P).toLocaleString('es-MX')} a $${Math.round(Pn).toLocaleString('es-MX')}.`,
+    `El escenario estima ${dS >= 0 ? 'incremento' : 'disminucion'} de demanda de ${dS >= 0 ? '+' : ''}${dS.toFixed(1)}%.`
+  ];
+  const recommendations = [];
+  if (lvl === 'low') {
+    recommendations.push('No tomar una decision automatica con este SKU; revisar una ventana con mas observaciones o usar subdepartamento.');
+  } else if (lvl === 'med') {
+    recommendations.push('Usar el resultado como prueba controlada, no como despliegue general.');
+  } else {
+    recommendations.push('El SKU puede considerarse para una prueba promocional con seguimiento de margen.');
+  }
+  if (marginRisk) recommendations.push('Reducir el descuento o acortar el periodo porque el margen proyectado cae.');
+  else if (revenueGood && demandGood) recommendations.push('Mantener el escenario como candidato porque demanda e ingresos se mueven favorablemente.');
+  if (!elastic) recommendations.push('Evitar descuentos agresivos: la demanda no parece compensar fuertemente la baja de precio.');
+  else recommendations.push('Priorizar inventario y disponibilidad antes de ejecutar, porque un SKU elastico puede elevar volumen rapidamente.');
+
+  setList('ai-insights', insights);
+  setList('ai-recommendations', recommendations);
+  document.getElementById('ai-conclusions').textContent =
+    lvl === 'high'
+      ? `Conclusion: el escenario es defendible si el objetivo es crecer volumen sin deteriorar margen de forma relevante. Debe monitorearse contra ventas reales por tienda.`
+      : lvl === 'med'
+        ? `Conclusion: la proyeccion es util para comparar escenarios, pero necesita validacion adicional antes de recomendar una promocion amplia.`
+        : `Conclusion: el resultado se debe presentar como baja confianza; conviene buscar mas datos, otra ventana temporal o una elasticidad agregada antes de decidir.`;
 }
 
 async function refreshQwenV2(disc, Pn, dSales, dMargin, season) {
