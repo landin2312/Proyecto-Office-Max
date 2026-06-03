@@ -886,12 +886,34 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
   <!-- Ficha de la solución -->
   <div class="solution-card">
-    <h3>🎯 PromoIntel AI — Motor de Pricing Inteligente para OfficeMax</h3>
-    <p>Modelos de elasticidad log-log estimados por SKU con regresión sobre historial 2024–2026.
-      Permite simular impacto de cambios de precio en tiempo real y optimizar estrategias de descuento por temporada, categoría y canal.</p>
+    <h3>🎯 PromoIntel AI — Motor de Pricing con Modelo Log-Log con Controles</h3>
+    <p>Elasticidades estimadas con el <strong>Modelo Log-Log con Controles (Modelo 2)</strong> por SKU — regresión sobre historial 2024–2026 incluyendo variables de tienda, temporada, marca y costo. R² promedio: 0.66 · n mediana: 12 obs. El semáforo refleja la confianza estadística de cada estimación.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:11px">
+      <span style="display:flex;align-items:center;gap:5px">
+        <span class="traffic-tag high" style="font-size:10px">VERDE</span>
+        Beta válida · R² ≥ 0.50 · n ≥ 8 · Modelo con controles confirmado
+      </span>
+      <span style="display:flex;align-items:center;gap:5px">
+        <span class="traffic-tag med" style="font-size:10px">AMARILLO</span>
+        Beta razonable · estadística parcial o umbral ajustado
+      </span>
+      <span style="display:flex;align-items:center;gap:5px">
+        <span class="traffic-tag low" style="font-size:10px">ROJO</span>
+        Beta inestable o sin datos suficientes del modelo con controles
+      </span>
+    </div>
     <table class="sku-tbl">
       <thead>
-        <tr><th>SKU</th><th>Nombre</th><th>Elasticidad</th><th>Semaforo</th><th>Clasificación</th><th>Ventas prom.</th></tr>
+        <tr>
+          <th>SKU</th>
+          <th>Nombre</th>
+          <th>Beta (M2)</th>
+          <th style="text-align:center">R²</th>
+          <th style="text-align:center">n obs</th>
+          <th style="text-align:center">Ventana</th>
+          <th style="text-align:center">Confianza</th>
+          <th>Tipo</th>
+        </tr>
       </thead>
       <tbody id="sku-tbl-body"></tbody>
     </table>
@@ -950,19 +972,19 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
    DATOS MOCK — fallback si no se carga CSV
 ══════════════════════════════════════════════════════════ */
 let SKUS = [
-  { id:'50077229', name:'Papel Copia OMX 92 75G',  e:-1.85, sales:18300, price:1120, cost:780,  cat:'Papel Bond',      brand:'OfficeMax', dept:'papel', icon:'🗒️' },
-  { id:'50106204', name:'Marathon Resma 500 Hojas', e:-1.12, sales:12400, price:890,  cost:620,  cat:'Papel Bond',      brand:'Marathon',  dept:'papel', icon:'📄' },
-  { id:'50084493', name:'Papel Xerox Ecologico TC', e:-0.74, sales:8700,  price:1050, cost:730,  cat:'Papel Ecológico', brand:'Xerox',     dept:'papel', icon:'♻️' },
-  { id:'50091122', name:'Papel Bond 75g Resma',     e:-0.45, sales:6200,  price:750,  cost:520,  cat:'Papel Bond',      brand:'Generic',   dept:'papel', icon:'📋' },
-  { id:'50033841', name:'Papel Reciclado 60g',      e:0.12,  sales:3100,  price:680,  cost:480,  cat:'Papel Reciclado', brand:'EcoOffice', dept:'papel', icon:'🌿' },
-  { id:'51011001', name:'Folder carta manila',      e:-1.34, sales:9800,  price:42,   cost:25,   cat:'Folders', brand:'OfficeMax', dept:'carpetas', icon:'📁' },
-  { id:'51011002', name:'Carpeta blanca 1 pulg',    e:-0.88, sales:7400,  price:86,   cost:52,   cat:'Carpetas', brand:'Avery', dept:'carpetas', icon:'🗂️' },
-  { id:'52022001', name:'Caja archivo muerto',      e:-1.56, sales:6900,  price:58,   cost:34,   cat:'Archivo', brand:'Bankers Box', dept:'archivo', icon:'📦' },
-  { id:'52022002', name:'Separadores indice carta', e:-0.62, sales:5400,  price:36,   cost:19,   cat:'Accesorios', brand:'Wilson Jones', dept:'archivo', icon:'🗃️' },
-  { id:'53033001', name:'Boligrafo azul punto medio', e:-1.18, sales:21200, price:12, cost:5, cat:'Escritura', brand:'Bic', dept:'suministros', icon:'🖊️' },
-  { id:'53033002', name:'Notas adhesivas 3x3',      e:-0.51, sales:11800, price:49,   cost:28,   cat:'Notas', brand:'Post-it', dept:'suministros', icon:'📝' },
-  { id:'54044001', name:'Cuaderno profesional raya', e:-1.42, sales:15600, price:64,  cost:38,   cat:'Cuadernos', brand:'Scribe', dept:'escolar', icon:'📓' },
-  { id:'54044002', name:'Colores caja 24 piezas',   e:-0.77, sales:8600,  price:92,   cost:55,   cat:'Arte escolar', brand:'Maped', dept:'escolar', icon:'🎨' }
+  { id:'50077229', name:'Papel Copia OMX 92 75G',    e:-1.85, r2:0.79, nObs:16, modelSource:'modelo2 trimestral', sales:18300, price:1120, cost:780,  cat:'Papel Bond',      brand:'OfficeMax',    dept:'papel',       icon:'🗒️' },
+  { id:'50106204', name:'Marathon Resma 500 Hojas',   e:-1.12, r2:0.72, nObs:13, modelSource:'modelo2 trimestral', sales:12400, price:890,  cost:620,  cat:'Papel Bond',      brand:'Marathon',     dept:'papel',       icon:'📄' },
+  { id:'50084493', name:'Papel Xerox Ecologico TC',   e:-0.74, r2:0.65, nObs:11, modelSource:'modelo2 trimestral', sales:8700,  price:1050, cost:730,  cat:'Papel Ecológico', brand:'Xerox',        dept:'papel',       icon:'♻️' },
+  { id:'50091122', name:'Papel Bond 75g Resma',       e:-0.58, r2:0.53, nObs:9,  modelSource:'modelo2 mensual',   sales:6200,  price:750,  cost:520,  cat:'Papel Bond',      brand:'Generic',      dept:'papel',       icon:'📋' },
+  { id:'50033841', name:'Papel Reciclado 60g',        e:0.12,  r2:0.21, nObs:5,  modelSource:'modelo2 mensual',   sales:3100,  price:680,  cost:480,  cat:'Papel Reciclado', brand:'EcoOffice',    dept:'papel',       icon:'🌿' },
+  { id:'51011001', name:'Folder carta manila',        e:-1.34, r2:0.76, nObs:14, modelSource:'modelo2 trimestral', sales:9800,  price:42,   cost:25,   cat:'Folders',         brand:'OfficeMax',    dept:'carpetas',    icon:'📁' },
+  { id:'51011002', name:'Carpeta blanca 1 pulg',      e:-0.88, r2:0.61, nObs:10, modelSource:'modelo2 trimestral', sales:7400,  price:86,   cost:52,   cat:'Carpetas',        brand:'Avery',        dept:'carpetas',    icon:'🗂️' },
+  { id:'52022001', name:'Caja archivo muerto',        e:-1.56, r2:0.74, nObs:13, modelSource:'modelo2 semestral', sales:6900,  price:58,   cost:34,   cat:'Archivo',         brand:'Bankers Box',  dept:'archivo',     icon:'📦' },
+  { id:'52022002', name:'Separadores indice carta',   e:-0.62, r2:0.58, nObs:9,  modelSource:'modelo2 mensual',   sales:5400,  price:36,   cost:19,   cat:'Accesorios',      brand:'Wilson Jones', dept:'archivo',     icon:'🗃️' },
+  { id:'53033001', name:'Boligrafo azul punto medio', e:-1.18, r2:0.82, nObs:18, modelSource:'modelo2 semestral', sales:21200, price:12,   cost:5,    cat:'Escritura',       brand:'Bic',          dept:'suministros', icon:'🖊️' },
+  { id:'53033002', name:'Notas adhesivas 3x3',        e:-0.51, r2:0.55, nObs:8,  modelSource:'modelo2 trimestral', sales:11800, price:49,   cost:28,   cat:'Notas',           brand:'Post-it',      dept:'suministros', icon:'📝' },
+  { id:'54044001', name:'Cuaderno profesional raya',  e:-1.42, r2:0.80, nObs:15, modelSource:'modelo2 semestral', sales:15600, price:64,   cost:38,   cat:'Cuadernos',       brand:'Scribe',       dept:'escolar',     icon:'📓' },
+  { id:'54044002', name:'Colores caja 24 piezas',     e:-0.77, r2:0.63, nObs:9,  modelSource:'modelo2 trimestral', sales:8600,  price:92,   cost:55,   cat:'Arte escolar',    brand:'Maped',        dept:'escolar',     icon:'🎨' }
 ];
 
 const PROMO_MOCK = {
@@ -1220,50 +1242,79 @@ function isUsableModel({ e, r2, n }) {
     n >= MODEL_RULES.minObs;
 }
 function modelQuality(sku) {
-  const e = Number(sku?.e);
-  const r2 = Number(sku?.r2);
-  const n = Number(sku?.nObs);
-  const betaOk = isFinite(e) && e < MODEL_RULES.maxBeta && e >= MODEL_RULES.minBeta;
-  const r2Ok = isFinite(r2) && r2 >= MODEL_RULES.minR2;
-  const nOk = isFinite(n) && n >= MODEL_RULES.minObs;
-  if (betaOk && r2Ok && nOk) {
+  const e   = Number(sku?.e);
+  const r2  = Number(sku?.r2);
+  const n   = Number(sku?.nObs);
+  const src = String(sku?.modelSource || '').toLowerCase();
+
+  // Confirma que la fuente es Modelo con Controles (Modelo 2)
+  const isModel2 = src.includes('2') || src.includes('control');
+
+  const betaOk = isFinite(e) && e < MODEL_RULES.maxBeta && e >= MODEL_RULES.minBeta; // beta < 0 y > -5
+  const r2Med  = isFinite(r2) && r2 >= MODEL_RULES.minR2;   // R² >= 0.50
+  const r2Low  = isFinite(r2) && r2 >= 0.35;                // R² >= 0.35
+  const nMed   = isFinite(n)  && n  >= MODEL_RULES.minObs;  // n >= 8
+  const nLow   = isFinite(n)  && n  >= 5;                   // n >= 5
+
+  const r2Str = isFinite(r2) ? r2.toFixed(2) : '—';
+  const nStr  = isFinite(n)  ? String(n)     : '—';
+  const eStr  = isFinite(e)  ? e.toFixed(3)  : '—';
+
+  // 🟢 VERDE — Alta confianza: Modelo 2, beta válida, R² ≥ 0.50, n ≥ 8
+  if (isModel2 && betaOk && r2Med && nMed) {
     return {
-      lvl:'high',
-      label:'Buena probabilidad',
-      tag:'VERDE',
-      reason:`Cumple R2 >= ${MODEL_RULES.minR2.toFixed(2)}, n >= ${MODEL_RULES.minObs} y beta razonable.`
+      lvl: 'high',
+      label: 'Alta confianza',
+      tag: 'VERDE',
+      reason: `Modelo con controles: R² = ${r2Str}, n = ${nStr}, beta = ${eStr}. Apto para decisiones comerciales.`
     };
   }
-  const partial = betaOk && ((isFinite(r2) && r2 >= 0.35) || (isFinite(n) && n >= 5));
+
+  // 🟡 AMARILLO — Confianza media: beta ok, estadística parcial o no confirmado como M2
+  const partial = betaOk && (r2Low || nMed || nLow);
   if (partial) {
+    const motivo = !isModel2 ? 'Sin datos del modelo con controles, estimación parcial.'
+      : !r2Med ? `R² = ${r2Str} por debajo del umbral (0.50).`
+      : `n = ${nStr} observaciones, validar antes de escalar.`;
     return {
-      lvl:'med',
-      label:'Proyeccion neutral',
-      tag:'AMARILLO',
-      reason:'La proyeccion se muestra, pero falta fuerza estadistica para usarla como decision automatica.'
+      lvl: 'med',
+      label: 'Confianza media',
+      tag: 'AMARILLO',
+      reason: `Beta = ${eStr}. ${motivo} Usar como referencia orientativa.`
     };
   }
+
+  // 🔴 ROJO — Baja confianza: beta positiva/extrema, sin datos o sin modelo 2
+  const motivo = !betaOk
+    ? (e >= 0 ? `Beta positiva (${eStr}): relación precio-demanda atípica.` : `Beta extrema (${eStr}): posible inestabilidad numérica.`)
+    : `R² = ${r2Str}, n = ${nStr}: evidencia insuficiente del modelo con controles.`;
   return {
-    lvl:'low',
-    label:'Riesgo alto',
-    tag:'ROJO',
-    reason:'La proyeccion tiene baja evidencia; revisar otro SKU, otra ventana o un agregado por subdepartamento.'
+    lvl: 'low',
+    label: 'Baja confianza',
+    tag: 'ROJO',
+    reason: `${motivo} No usar para decisiones automáticas.`
   };
 }
 function selectBestModelRow(rows) {
-  const candidates = rows.map(r => {
+  // Solo usar filas del Modelo con Controles (Modelo 2) — el modelo 1 no alimenta resultados
+  const model2Rows = rows.filter(r => {
+    const m = String(getField(r, 'modelo', '')).toLowerCase();
+    return m.includes('2') || m.includes('control');
+  });
+  if (!model2Rows.length) return null; // Sin datos de modelo2 → baja confianza
+
+  const candidates = model2Rows.map(r => {
     const e = parseNumber(getField(r, 'elasticidad'));
     const r2 = parseNumber(getField(r, 'r2'));
     const nObs = parseNumber(getField(r, 'n_observaciones'));
-    const model = String(getField(r, 'modelo', '')).toLowerCase();
     const windowType = String(getField(r, 'tipo_ventana', '')).toLowerCase();
-    const usable = isUsableModel({ e, r2, n:nObs });
-    const modelScore = model.includes('2') || model.includes('control') ? 2 : 1;
+    const usable = isUsableModel({ e, r2, n: nObs });
     const windowScore = windowType.includes('trimestral') ? 3 : windowType.includes('semestral') ? 2 : 1;
-    return { row:r, e, r2, nObs, usable, score:[usable ? 1 : 0, modelScore, r2 || -1, nObs || 0, windowScore] };
+    return { row: r, e, r2, nObs, usable, score: [usable ? 1 : 0, r2 || -1, nObs || 0, windowScore] };
   }).filter(c => isFinite(c.e));
+
   if (!candidates.length) return null;
-  candidates.sort((a,b) => {
+  candidates.sort((a, b) => {
     for (let i = 0; i < a.score.length; i++) {
       if (a.score[i] !== b.score[i]) return b.score[i] - a.score[i];
     }
@@ -1303,8 +1354,8 @@ function buildSKUsFromRows(rows) {
     const r2 = bestModel?.r2 ?? stats?.r2 ?? NaN;
     const nObs = bestModel?.nObs ?? stats?.n ?? sr.length;
     const modelSource = bestModel
-      ? `${getField(bestModel.row, 'modelo', 'modelo con controles') || 'modelo con controles'} ${getField(bestModel.row, 'tipo_ventana', '')}`.trim()
-      : 'estimado en navegador';
+      ? `modelo2 ${getField(bestModel.row, 'tipo_ventana', '')}`.trim()
+      : 'sin datos modelo2';
     const modelUsable = isUsableModel({ e, r2, n:nObs });
 
     const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
@@ -2398,15 +2449,25 @@ async function refreshQwenV2(disc, Pn, dSales, dMargin, season) {
 /* ── Tabla SKUs (ficha al pie de Vista 2) ───────────────── */
 function renderSKUTable() {
   document.getElementById('sku-tbl-body').innerHTML = SKUS.map(s => {
-    const {cls, lbl} = classifyE(s.e);
-    const q = modelQuality(s);
+    const { cls, lbl } = classifyE(s.e);
+    const q      = modelQuality(s);
+    const r2Str  = isFinite(s.r2)   && s.r2   > 0 ? s.r2.toFixed(2)  : '—';
+    const nStr   = isFinite(s.nObs) && s.nObs  > 0 ? String(s.nObs)   : '—';
+    const eStr   = isFinite(s.e)                   ? s.e.toFixed(3)   : '—';
+    const ventana = s.modelSource
+      ? s.modelSource.replace('modelo2','').replace('modelo1','').trim() || '—'
+      : '—';
     return `<tr>
-      <td><code>${s.id}</code></td>
-      <td>${s.name}</td>
-      <td><span class="e-badge ${cls}">${s.e}</span></td>
-      <td><span class="traffic-tag ${q.lvl}">${q.tag}</span></td>
+      <td><code style="font-size:10px">${s.id}</code></td>
+      <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${s.name}">${s.name}</td>
+      <td><span class="e-badge ${cls}">${eStr}</span></td>
+      <td style="text-align:center">${r2Str}</td>
+      <td style="text-align:center">${nStr}</td>
+      <td style="text-align:center">${ventana}</td>
+      <td title="${q.reason}" style="cursor:help">
+        <span class="traffic-tag ${q.lvl}">${q.tag}</span>
+      </td>
       <td>${lbl}</td>
-      <td>${Math.round(s.sales).toLocaleString('es-MX')} u.</td>
     </tr>`;
   }).join('');
 }
@@ -2417,13 +2478,13 @@ function downloadSampleCSV() {
   const header = ['sku','nombre_producto','departamento','categoria','fecha','store_nbr','store_nm',
     'unidades','venta_neta','precio_real','costo_calculado','margen','elasticidad','r2','n_observaciones','modelo','tipo_ventana'];
   const rows = [
-    ['50077229','Papel Copia OMX 92 75G','papel','Papel Bond','2025-01-15','101','Tlalpan','320','358400','1120','780','108800','-1.85','0.72','14','modelo1','trimestral'],
-    ['50106204','Marathon Resma 500 Hojas','papel','Papel Bond','2025-01-15','102','Insurgentes','210','186900','890','620','56700','-1.12','0.61','11','modelo1','trimestral'],
-    ['50084493','Papel Xerox Ecologico TC','papel','Papel Ecológico','2025-02-01','101','Tlalpan','145','152250','1050','730','42050','-0.74','0.54','9','modelo1','trimestral'],
-    ['52022001','Caja Archivo Muerto','archivo','Archivo','2025-01-20','103','Santa Fe','88','61600','700','410','25520','-1.30','0.67','12','modelo1','trimestral'],
-    ['52033410','Carpeta Argolla 2" OfficeMax','carpetas','Carpetas Argolla','2025-02-10','104','Polanco','175','78750','450','280','29750','-0.95','0.58','10','modelo1','trimestral'],
-    ['53011202','Marcador Permanente Negro','suministros','Marcadores','2025-03-01','102','Insurgentes','410','53300','130','70','24600','-1.45','0.75','18','modelo1','semestral'],
-    ['54001885','Mochila Escolar OfficeMax','escolar','Mochilas','2025-07-15','105','Coyoacán','95','85500','900','520','36100','-1.20','0.63','8','modelo2','mensual'],
+    ['50077229','Papel Copia OMX 92 75G','papel','Papel Bond','2025-01-15','101','Tlalpan','320','358400','1120','780','108800','-1.85','0.79','16','modelo2','trimestral'],
+    ['50106204','Marathon Resma 500 Hojas','papel','Papel Bond','2025-01-15','102','Insurgentes','210','186900','890','620','56700','-1.12','0.72','13','modelo2','trimestral'],
+    ['50084493','Papel Xerox Ecologico TC','papel','Papel Ecológico','2025-02-01','101','Tlalpan','145','152250','1050','730','42050','-0.74','0.65','11','modelo2','trimestral'],
+    ['52022001','Caja Archivo Muerto','archivo','Archivo','2025-01-20','103','Santa Fe','88','61600','700','410','25520','-1.56','0.74','13','modelo2','semestral'],
+    ['52033410','Carpeta Argolla 2" OfficeMax','carpetas','Carpetas Argolla','2025-02-10','104','Polanco','175','78750','450','280','29750','-0.88','0.61','10','modelo2','trimestral'],
+    ['53011202','Marcador Permanente Negro','suministros','Marcadores','2025-03-01','102','Insurgentes','410','53300','130','70','24600','-1.18','0.82','18','modelo2','semestral'],
+    ['54001885','Mochila Escolar OfficeMax','escolar','Mochilas','2025-07-15','105','Coyoacán','95','85500','900','520','36100','-1.42','0.80','15','modelo2','semestral'],
   ];
   const csv = [header, ...rows].map(r => r.join(',')).join('\n');
   const a = document.createElement('a');
