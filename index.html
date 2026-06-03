@@ -366,6 +366,43 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   font-size:13px;color:#aaa;background:rgba(255,255,255,.88);display:none
 }
 
+/* ── Botón plantilla CSV ────────────────────────────────── */
+.sample-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#fff;border:1.5px solid var(--navy);color:var(--navy);
+  padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;
+  cursor:pointer;transition:background .15s,color .15s
+}
+.sample-btn:hover{background:var(--navy);color:#fff}
+.btn-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px}
+
+/* ── Recomendación ejecutiva ────────────────────────────── */
+.exec-rec{
+  background:linear-gradient(135deg,var(--navy) 0%,#2d4a8a 100%);
+  border-radius:var(--radius);padding:22px 26px;color:#fff;
+  box-shadow:0 4px 20px rgba(26,46,90,.25);margin-top:4px
+}
+.exec-rec-hdr{
+  display:flex;align-items:center;gap:10px;
+  font-size:13px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;opacity:.75;margin-bottom:14px
+}
+.exec-rec-hdr span{font-size:18px}
+.exec-rec-title{font-size:17px;font-weight:800;margin-bottom:10px;line-height:1.35}
+.exec-rec-body{font-size:13px;opacity:.9;line-height:1.65;margin-bottom:16px}
+.exec-rec-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.exec-pill{
+  font-size:11px;font-weight:700;border-radius:999px;
+  padding:4px 12px;border:1.5px solid rgba(255,255,255,.35);color:#fff
+}
+.exec-pill.green{background:rgba(0,168,107,.25);border-color:rgba(0,168,107,.5)}
+.exec-pill.orange{background:rgba(245,166,35,.2);border-color:rgba(245,166,35,.45)}
+.exec-pill.red{background:rgba(229,57,53,.2);border-color:rgba(229,57,53,.45)}
+.exec-rec-footer{
+  border-top:1px solid rgba(255,255,255,.2);padding-top:12px;
+  font-size:11px;opacity:.6;display:flex;align-items:center;gap:6px
+}
+
 /* ── Responsive ─────────────────────────────────────────── */
 @media(max-width:768px){
   .main-content{padding:12px}
@@ -547,6 +584,27 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <span class="loading-line"><span class="spinner"></span> Generando insight…</span>
       </div>
     </div>
+  </div>
+
+  <!-- Plantilla CSV + Recomendación ejecutiva -->
+  <div class="section-card" style="margin-top:10px">
+    <div class="section-title">📥 Archivo de ejemplo y cierre</div>
+    <div style="padding:4px 0 14px">
+      <p style="font-size:13px;color:#555;margin-bottom:10px">
+        Descarga la plantilla CSV con el formato y columnas que acepta el simulador para cargar tus propios datos.
+      </p>
+      <div class="btn-row">
+        <button class="sample-btn" onclick="downloadSampleCSV()">📄 Descargar plantilla CSV de ejemplo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="exec-rec" id="exec-rec-v1">
+    <div class="exec-rec-hdr"><span>📋</span> Recomendación Ejecutiva — Análisis Descriptivo</div>
+    <div class="exec-rec-title" id="exec-title-v1">Cargando recomendación…</div>
+    <div class="exec-rec-body" id="exec-body-v1"></div>
+    <div class="exec-rec-pills" id="exec-pills-v1"></div>
+    <div class="exec-rec-footer">⚡ Generado automáticamente con base en los filtros activos · PromoIntel AI</div>
   </div>
 
 </div><!-- /vista1 -->
@@ -818,7 +876,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
 
       <!-- Exportar -->
-      <button class="export-btn" onclick="exportCSV()">⬇️ Exportar resultados a CSV</button>
+      <div class="btn-row">
+        <button class="export-btn" onclick="exportCSV()">⬇️ Exportar resultados a CSV</button>
+        <button class="sample-btn" onclick="downloadSampleCSV()">📄 Descargar plantilla CSV de ejemplo</button>
+      </div>
 
     </div><!-- /results col -->
   </div><!-- /v2-grid -->
@@ -852,6 +913,14 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <p id="ai-conclusions">Las conclusiones se actualizan con base en el SKU, descuento, margen y semaforo del modelo.</p>
       </div>
     </div>
+  </div>
+
+  <div class="exec-rec" id="exec-rec-v2">
+    <div class="exec-rec-hdr"><span>🎯</span> Recomendación Ejecutiva — Cierre de Consultoría</div>
+    <div class="exec-rec-title" id="exec-title-v2">Selecciona un SKU y ajusta el descuento para generar el cierre ejecutivo.</div>
+    <div class="exec-rec-body" id="exec-body-v2"></div>
+    <div class="exec-rec-pills" id="exec-pills-v2"></div>
+    <div class="exec-rec-footer">⚡ Generado automáticamente con base en el escenario simulado · PromoIntel AI</div>
   </div>
 
 </div><!-- /vista2 -->
@@ -1864,6 +1933,7 @@ function applyFilters() {
   });
   updateCharts(filtered);
   updateInterpSync();
+  updateExecRecV1();
   loadInterps();
 }
 
@@ -2156,7 +2226,8 @@ function updateSim() {
   });
 
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(()=>refreshQwenV2(disc,Pn,dS,dM,season), 900);
+  debounceTimer = setTimeout(()=>{ refreshQwenV2(disc,Pn,dS,dM,season); updateExecRecV2(); }, 900);
+  updateExecRecV2();
 }
 
 function renderResultCards({ Q, Qsim, Rbase, Rsim, Mbase, Msim, dS, dR, dM, lvl, fmtN, fmtM }) {
@@ -2341,6 +2412,122 @@ function renderSKUTable() {
 }
 
 /* ── Exportar CSV ───────────────────────────────────────── */
+/* ── Plantilla CSV de ejemplo ───────────────────────────── */
+function downloadSampleCSV() {
+  const header = ['sku','nombre_producto','departamento','categoria','fecha','store_nbr','store_nm',
+    'unidades','venta_neta','precio_real','costo_calculado','margen','elasticidad','r2','n_observaciones','modelo','tipo_ventana'];
+  const rows = [
+    ['50077229','Papel Copia OMX 92 75G','papel','Papel Bond','2025-01-15','101','Tlalpan','320','358400','1120','780','108800','-1.85','0.72','14','modelo1','trimestral'],
+    ['50106204','Marathon Resma 500 Hojas','papel','Papel Bond','2025-01-15','102','Insurgentes','210','186900','890','620','56700','-1.12','0.61','11','modelo1','trimestral'],
+    ['50084493','Papel Xerox Ecologico TC','papel','Papel Ecológico','2025-02-01','101','Tlalpan','145','152250','1050','730','42050','-0.74','0.54','9','modelo1','trimestral'],
+    ['52022001','Caja Archivo Muerto','archivo','Archivo','2025-01-20','103','Santa Fe','88','61600','700','410','25520','-1.30','0.67','12','modelo1','trimestral'],
+    ['52033410','Carpeta Argolla 2" OfficeMax','carpetas','Carpetas Argolla','2025-02-10','104','Polanco','175','78750','450','280','29750','-0.95','0.58','10','modelo1','trimestral'],
+    ['53011202','Marcador Permanente Negro','suministros','Marcadores','2025-03-01','102','Insurgentes','410','53300','130','70','24600','-1.45','0.75','18','modelo1','semestral'],
+    ['54001885','Mochila Escolar OfficeMax','escolar','Mochilas','2025-07-15','105','Coyoacán','95','85500','900','520','36100','-1.20','0.63','8','modelo2','mensual'],
+  ];
+  const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = 'PromoIntel_plantilla_ejemplo.csv';
+  a.click();
+}
+
+/* ── Recomendación ejecutiva dinámica ───────────────────── */
+function updateExecRec() {
+  updateExecRecV1();
+  updateExecRecV2();
+}
+
+function updateExecRecV1() {
+  const deptSel   = document.getElementById('dept-filter');
+  const deptLabel = deptSel.selectedOptions?.[0]?.textContent || 'todos los departamentos';
+  const promoSel  = document.getElementById('promo-filter').value;
+  const promoLabel = promoSel === 'todos' ? 'todas las promociones' : getSelectedLabel('promo-filter', promoSel);
+  const filtered  = filterData();
+  const skus      = filtered.skus;
+  const topE      = [...skus].sort((a, b) => a.e - b.e)[0];
+  const ePct      = skus.length ? Math.round(skus.filter(s => s.e < -1).length / skus.length * 100) : 0;
+  const s1Txt     = document.getElementById('s1-val').textContent || '+32%';
+  const s3Txt     = document.getElementById('s3-val').textContent || '+27%';
+
+  const eLabel    = topE?.e != null ? topE.e.toFixed(2) : '—';
+  const skuName   = topE?.name || 'el SKU principal';
+  const elastClass = topE?.e < -1 ? 'Elástico' : topE?.e < 0 ? 'Inelástico' : 'Revisar';
+  const pillClass  = topE?.e < -1 ? 'green' : topE?.e < 0 ? 'orange' : 'red';
+
+  document.getElementById('exec-title-v1').textContent =
+    `En ${deptLabel}, "${promoLabel}" es la estrategia de precio con mayor potencial de impacto en ventas e ingresos.`;
+
+  document.getElementById('exec-body-v1').textContent =
+    `El ${ePct}% de los SKUs analizados en ${deptLabel} responden significativamente a cambios de precio (elasticidad < −1). ` +
+    `El SKU más sensible es ${skuName} con elasticidad ${eLabel}: un ajuste del 10% en precio puede generar hasta ` +
+    `${Math.abs(+(eLabel) * 10).toFixed(0)}% de variación en unidades vendidas. ` +
+    `Las promociones de tipo "${promoLabel}" generan un incremento promedio de ${s3Txt} en ventas, ` +
+    `con el mejor escenario produciendo ${s1Txt} de utilidad incremental. ` +
+    `Se recomienda focalizar los esfuerzos promocionales en los SKUs elásticos y evaluar su impacto por temporada.`;
+
+  const pills = [
+    { label: `${ePct}% SKUs elásticos`, cls: ePct > 50 ? 'green' : 'orange' },
+    { label: `Mejor promo: ${promoLabel}`, cls: 'green' },
+    { label: `SKU líder: ${skuName.split(' ').slice(0,3).join(' ')}`, cls: pillClass },
+    { label: `Elasticidad: ${eLabel}`, cls: pillClass },
+    { label: `Impacto ventas: ${s3Txt}`, cls: 'orange' },
+  ];
+  const pillsEl = document.getElementById('exec-pills-v1');
+  pillsEl.innerHTML = pills.map(p => `<span class="exec-pill ${p.cls}">${p.label}</span>`).join('');
+}
+
+function updateExecRecV2() {
+  const disc    = +document.getElementById('disc-slider').value;
+  const sku     = activeSKU;
+  if (!sku) return;
+  const season  = +document.getElementById('season-sel').value;
+  const period  = +document.getElementById('period-sel').value;
+  const promoType = getSelectedLabel('promo-type-sel', 'Descuento %');
+  const seasonLabel = getSelectedLabel('season-sel', 'Sin evento especial');
+  const confLbl = document.getElementById('conf-lbl')?.textContent || 'Media';
+  const incTxt  = document.getElementById('res-inc')?.textContent || '$0';
+  const marginTxt = document.getElementById('res-margin')?.textContent || '$0';
+  const unitsTxt  = document.getElementById('res-units')?.textContent || '0';
+  const actionTxt = document.getElementById('res-action')?.textContent || '—';
+
+  if (disc === 0) {
+    document.getElementById('exec-title-v2').textContent =
+      'Ajusta el descuento para generar el cierre ejecutivo del escenario simulado.';
+    document.getElementById('exec-body-v2').textContent = '';
+    document.getElementById('exec-pills-v2').innerHTML = '';
+    return;
+  }
+
+  const confClass = confLbl === 'Alta' ? 'green' : confLbl === 'Media' ? 'orange' : 'red';
+  const actionClass = actionTxt.toLowerCase().includes('recomienda') ? 'green' :
+                      actionTxt.toLowerCase().includes('neutro') ? 'orange' : 'red';
+
+  document.getElementById('exec-title-v2').textContent =
+    `Con un ${disc}% de descuento en ${sku.name}, se proyecta un ingreso incremental de ${incTxt} en ${period} semanas.`;
+
+  document.getElementById('exec-body-v2').textContent =
+    `Bajo el escenario de ${promoType} del ${disc}% aplicado al SKU ${sku.name} (elasticidad ${sku.e?.toFixed(2) ?? '—'}), ` +
+    `el modelo proyecta ${unitsTxt} unidades adicionales y ${marginTxt} de margen incremental durante ${period} semanas` +
+    (seasonLabel !== 'Sin evento especial' ? ` en temporada de ${seasonLabel}` : '') + `. ` +
+    `La confianza del modelo es ${confLbl.toLowerCase()}, lo que indica que esta proyección ` +
+    `${confLbl === 'Alta' ? 'tiene respaldo estadístico sólido y puede usarse para tomar decisiones comerciales.' :
+      confLbl === 'Media' ? 'es orientativa; se recomienda validar con el equipo comercial antes de implementar.' :
+      'requiere revisión adicional antes de cualquier implementación masiva.'} ` +
+    `Acción sugerida: ${actionTxt}.`;
+
+  const pills = [
+    { label: `Descuento: ${disc}%`, cls: disc > 20 ? 'orange' : 'green' },
+    { label: `Confianza: ${confLbl}`, cls: confClass },
+    { label: `Ingreso incremental: ${incTxt}`, cls: 'green' },
+    { label: `Margen incremental: ${marginTxt}`, cls: 'green' },
+    { label: promoType, cls: 'orange' },
+    { label: seasonLabel !== 'Sin evento especial' ? seasonLabel : `${period} semanas`, cls: 'orange' },
+  ];
+  document.getElementById('exec-pills-v2').innerHTML =
+    pills.map(p => `<span class="exec-pill ${p.cls}">${p.label}</span>`).join('');
+}
+
 function exportCSV() {
   const disc   = +document.getElementById('disc-slider').value;
   const season = +document.getElementById('season-sel').value;
@@ -2412,6 +2599,7 @@ async function init() {
   renderChartScatter();
   renderChartTemporal();
   updateInterpSync(); // muestra texto dinámico de inmediato sin esperar Qwen
+  updateExecRec();    // recomendación ejecutiva inicial
   loadInterps();      // intenta Qwen; si responde → badge verde y sobreescribe con IA
   updateSKU();
   renderSKUTable();
