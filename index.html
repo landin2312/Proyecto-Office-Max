@@ -1817,6 +1817,25 @@ async function loadInterps() {
   setText('key-insight', r4 || mock.insight, !r4);
 }
 
+/* ── Actualiza las interpretaciones de forma sincrónica con los datos actuales ── */
+function updateInterpSync() {
+  const deptSel   = document.getElementById('dept-filter');
+  const deptLabel = deptSel.selectedOptions?.[0]?.textContent || deptSel.value || 'este departamento';
+  const promoSel  = document.getElementById('promo-filter').value;
+  const promoLabel = promoSel === 'todos' ? 'Todas' : getSelectedLabel('promo-filter', promoSel);
+  const filtered  = filterData();
+  const skus      = filtered.skus;
+  const topE      = [...skus].sort((a,b) => a.e - b.e)[0];
+  const ePct      = skus.length ? Math.round(skus.filter(s=>s.e<-1).length/skus.length*100) : 60;
+  const s1Txt     = document.getElementById('s1-val').textContent || '+32%';
+  const s3Txt     = document.getElementById('s3-val').textContent || '+27%';
+  const mock      = getMockTexts(deptLabel, topE, ePct, s1Txt, s3Txt, promoLabel);
+  setText('interp-1',   mock.i1,     true);
+  setText('interp-2',   mock.i2,     true);
+  setText('interp-3',   mock.i3,     true);
+  setText('key-insight', mock.insight, true);
+}
+
 /* ── Filtros Vista 1: filtra + actualiza gráficas + llama Qwen ── */
 function applyFilters() {
   const dept = document.getElementById('dept-filter').value;
@@ -1844,6 +1863,7 @@ function applyFilters() {
     skus: filtered.skus.length
   });
   updateCharts(filtered);
+  updateInterpSync();
   loadInterps();
 }
 
@@ -2391,7 +2411,8 @@ async function init() {
   renderChartPromo();
   renderChartScatter();
   renderChartTemporal();
-  loadInterps();    // intenta Qwen; si responde → badge verde automáticamente
+  updateInterpSync(); // muestra texto dinámico de inmediato sin esperar Qwen
+  loadInterps();      // intenta Qwen; si responde → badge verde y sobreescribe con IA
   updateSKU();
   renderSKUTable();
 }
