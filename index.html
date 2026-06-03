@@ -904,12 +904,19 @@ const TEMPORAL_MOCK = {
   labels: ['-4 sem','-3 sem','-2 sem','-1 sem','Inicio','+1 sem','+2 sem','+3 sem','+4 sem'],
   data:   [100, 102, 98, 101, 127, 134, 119, 112, 104]
 };
-const MOCK_TEXTS = {
-  i1: 'Los descuentos del 15% y 20% generan el mayor incremento de ingresos en PAPEL. Se recomienda priorizarlos en temporadas de alta demanda como Regreso a Clases.',
-  i2: 'El SKU 50077229 (Papel Copia OMX) es el más sensible al precio con elasticidad −1.85. Un ajuste de 10% en precio puede generar hasta un 18% de variación en ventas.',
-  i3: 'Las ventas suben 27% en la semana de inicio de promoción y regresan gradualmente al nivel base en 2–3 semanas. El efecto post-promo es moderado y predecible.',
-  insight: 'En PAPEL, los descuentos del 15–20% generan el mejor balance entre incremento de volumen e ingresos sin erosionar significativamente el margen operativo.'
-};
+function getMockTexts(dept, topE, ePct, s1Txt, s3Txt, promoLabel) {
+  const deptLabel = dept || 'este departamento';
+  const skuName   = topE?.name || 'el SKU principal';
+  const eVal      = topE?.e != null ? topE.e.toFixed(2) : '−1.85';
+  const eAbs      = topE?.e != null ? Math.abs(topE.e * 10).toFixed(0) : '18';
+  const promo     = promoLabel || 'descuento directo';
+  return {
+    i1: `Los escenarios de precio en ${deptLabel} generan hasta ${s1Txt} de utilidad incremental vs precio actual. Se recomienda priorizar los descuentos más efectivos en temporadas de alta demanda.`,
+    i2: `${skuName} es el SKU más sensible al precio en ${deptLabel} con elasticidad ${eVal}. Un ajuste del 10% en precio puede generar hasta un ${eAbs}% de variación en ventas.`,
+    i3: `Las ventas en ${deptLabel} cambian ${s3Txt} durante las promociones. El tipo de promoción más efectivo es "${promo}"; el efecto tiende a estabilizarse en 2–3 semanas.`,
+    insight: `En ${deptLabel}, los descuentos bien segmentados por SKU elástico generan el mejor balance entre incremento de volumen e ingresos sin erosionar significativamente el margen operativo.`
+  };
+}
 
 /* ── Estado global ──────────────────────────────────────── */
 let activeSKU   = SKUS[0];
@@ -1788,22 +1795,24 @@ async function loadInterps() {
 
   ['interp-1','interp-2','interp-3','key-insight'].forEach(setLoading);
 
+  const mock = getMockTexts(dept, topE, ePct, s1Txt, s3Txt, promoLabel);
+
   const p1 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el mejor escenario de precio genera ${s1Txt} de utilidad incremental vs precio actual. El SKU más elástico es ${topE?.name||'N/A'} con elasticidad ${topE?.e??'-1.85'}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
   const r1 = await askQwen(p1);
   if (!r1) setBadge(false);
-  setText('interp-1', r1 || MOCK_TEXTS.i1, !r1);
+  setText('interp-1', r1 || mock.i1, !r1);
 
   const p2 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el ${ePct}% de los SKUs son altamente elásticos al precio. El SKU más sensible es ${topE?.name||'N/A'} con elasticidad ${topE?.e??'-1.85'} y ventas promedio de ${Math.round(topE?.sales||18300).toLocaleString('es-MX')} unidades. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
   const r2 = await askQwen(p2);
-  setText('interp-2', r2 || MOCK_TEXTS.i2, !r2);
+  setText('interp-2', r2 || mock.i2, !r2);
 
   const p3 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, las ventas cambian ${s3Txt} durante las promociones. El tipo de promoción más efectivo es ${promoLabel}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
   const r3 = await askQwen(p3);
-  setText('interp-3', r3 || MOCK_TEXTS.i3, !r3);
+  setText('interp-3', r3 || mock.i3, !r3);
 
   const p4 = `Dado el análisis del departamento ${dept} (mejor promoción: ${promoLabel}, SKUs elásticos: ${ePct}%, cambio en ventas: ${s3Txt}), genera UN insight accionable de negocio en una sola oración, en español.`;
   const r4 = await askQwen(p4);
-  setText('key-insight', r4 || MOCK_TEXTS.insight, !r4);
+  setText('key-insight', r4 || mock.insight, !r4);
 }
 
 /* ── Filtros Vista 1: filtra + actualiza gráficas + llama Qwen ── */
