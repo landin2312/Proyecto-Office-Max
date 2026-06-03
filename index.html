@@ -1783,7 +1783,9 @@ function setText(id, txt, manual = false) {
 
 /* ── Interpretaciones Qwen (Vista 1) ────────────────────── */
 async function loadInterps() {
-  const dept      = document.getElementById('dept-filter').value.toUpperCase();
+  const deptSel   = document.getElementById('dept-filter');
+  const dept      = deptSel.value.toUpperCase();
+  const deptLabel = deptSel.selectedOptions?.[0]?.textContent || dept;
   const promoSel  = document.getElementById('promo-filter').value;
   const promoLabel = promoSel === 'todos' ? 'Todas' : getSelectedLabel('promo-filter', promoSel);
   const filtered  = filterData();
@@ -1795,22 +1797,22 @@ async function loadInterps() {
 
   ['interp-1','interp-2','interp-3','key-insight'].forEach(setLoading);
 
-  const mock = getMockTexts(dept, topE, ePct, s1Txt, s3Txt, promoLabel);
+  const mock = getMockTexts(deptLabel, topE, ePct, s1Txt, s3Txt, promoLabel);
 
-  const p1 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el mejor escenario de precio genera ${s1Txt} de utilidad incremental vs precio actual. El SKU más elástico es ${topE?.name||'N/A'} con elasticidad ${topE?.e??'-1.85'}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
+  const p1 = `Eres un analista de pricing de OfficeMax. En el departamento ${deptLabel}, el mejor escenario de precio genera ${s1Txt} de utilidad incremental vs precio actual. El SKU más elástico es ${topE?.name||'N/A'} con elasticidad ${topE?.e??'-1.85'}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
   const r1 = await askQwen(p1);
   if (!r1) setBadge(false);
   setText('interp-1', r1 || mock.i1, !r1);
 
-  const p2 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, el ${ePct}% de los SKUs son altamente elásticos al precio. El SKU más sensible es ${topE?.name||'N/A'} con elasticidad ${topE?.e??'-1.85'} y ventas promedio de ${Math.round(topE?.sales||18300).toLocaleString('es-MX')} unidades. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
+  const p2 = `Eres un analista de pricing de OfficeMax. En el departamento ${deptLabel}, el ${ePct}% de los SKUs son altamente elásticos al precio. El SKU más sensible es ${topE?.name||'N/A'} con elasticidad ${topE?.e??'-1.85'} y ventas promedio de ${Math.round(topE?.sales||18300).toLocaleString('es-MX')} unidades. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
   const r2 = await askQwen(p2);
   setText('interp-2', r2 || mock.i2, !r2);
 
-  const p3 = `Eres un analista de pricing de OfficeMax. En el departamento ${dept}, las ventas cambian ${s3Txt} durante las promociones. El tipo de promoción más efectivo es ${promoLabel}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
+  const p3 = `Eres un analista de pricing de OfficeMax. En el departamento ${deptLabel}, las ventas cambian ${s3Txt} durante las promociones. El tipo de promoción más efectivo es ${promoLabel}. Redacta una interpretación de negocio de máximo 2 oraciones, en español, sin tecnicismos, orientada a decisión.`;
   const r3 = await askQwen(p3);
   setText('interp-3', r3 || mock.i3, !r3);
 
-  const p4 = `Dado el análisis del departamento ${dept} (mejor promoción: ${promoLabel}, SKUs elásticos: ${ePct}%, cambio en ventas: ${s3Txt}), genera UN insight accionable de negocio en una sola oración, en español.`;
+  const p4 = `Dado el análisis del departamento ${deptLabel} (mejor promoción: ${promoLabel}, SKUs elásticos: ${ePct}%, cambio en ventas: ${s3Txt}), genera UN insight accionable de negocio en una sola oración, en español.`;
   const r4 = await askQwen(p4);
   setText('key-insight', r4 || mock.insight, !r4);
 }
