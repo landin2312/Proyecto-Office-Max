@@ -51,8 +51,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 .status-dot.online{background:#4caf50}
 .status-dot.offline{background:#f44336}
-.omx-logo{display:flex;align-items:center;padding-left:12px;border-left:1px solid var(--border);margin-left:4px}
-.omx-logo svg{display:block}
+.omx-logo{display:flex;align-items:center;padding-left:14px;border-left:1px solid var(--border);margin-left:4px}
+.omx-logo svg{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.10))}
 
 /* ── Layout principal ───────────────────────────────────── */
 .main-content{max-width:1400px;margin:0 auto;padding:24px}
@@ -445,15 +445,45 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 
   <div class="omx-logo" title="OfficeMax México">
-    <svg width="116" height="32" viewBox="0 0 116 32" role="img" aria-label="OfficeMax">
-      <!-- Fondo rojo -->
-      <rect width="116" height="32" rx="4" fill="#CC0000"/>
-      <!-- Línea decorativa inferior -->
-      <rect y="26" width="116" height="6" rx="0" fill="#AA0000"/>
-      <!-- Texto OFFICEMAX -->
-      <text x="58" y="20" text-anchor="middle" fill="#ffffff"
-        font-family="'Arial Black',Arial,sans-serif"
-        font-weight="900" font-size="13" letter-spacing="0.8">OFFICEMAX</text>
+    <svg width="178" height="44" viewBox="0 0 178 44" role="img" aria-label="OfficeMax">
+      <defs>
+        <clipPath id="omx-ball-clip">
+          <circle cx="22" cy="22" r="20"/>
+        </clipPath>
+        <radialGradient id="omx-ball-grad" cx="36%" cy="32%" r="62%">
+          <stop offset="0%" stop-color="#f0d040"/>
+          <stop offset="100%" stop-color="#a08010"/>
+        </radialGradient>
+      </defs>
+
+      <!-- Bola de ligas -->
+      <g clip-path="url(#omx-ball-clip)">
+        <circle cx="22" cy="22" r="20" fill="url(#omx-ball-grad)"/>
+        <!-- Liga verde horizontal -->
+        <ellipse cx="22" cy="22" rx="20" ry="5.5" fill="none" stroke="#2e7d32" stroke-width="5.5"/>
+        <!-- Liga verde vertical -->
+        <ellipse cx="22" cy="22" rx="5.5" ry="20" fill="none" stroke="#388e3c" stroke-width="5.5"/>
+        <!-- Liga roja diagonal -->
+        <ellipse cx="22" cy="22" rx="20" ry="6" fill="none" stroke="#c62828" stroke-width="5" transform="rotate(42 22 22)"/>
+        <!-- Liga azul diagonal -->
+        <ellipse cx="22" cy="22" rx="20" ry="6" fill="none" stroke="#1565c0" stroke-width="4.5" transform="rotate(-42 22 22)"/>
+        <!-- Liga naranja -->
+        <ellipse cx="22" cy="22" rx="20" ry="5.5" fill="none" stroke="#e65100" stroke-width="4" transform="rotate(75 22 22)"/>
+      </g>
+      <!-- Borde sutil de la bola -->
+      <circle cx="22" cy="22" r="20" fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="1"/>
+
+      <!-- Texto OfficeMax -->
+      <text x="51" y="31"
+        font-family="'Georgia','Times New Roman',serif"
+        font-weight="900"
+        font-size="23"
+        fill="#111111">OfficeMax</text>
+      <!-- Símbolo registrado -->
+      <text x="168" y="17"
+        font-family="Arial,sans-serif"
+        font-size="9"
+        fill="#444444">®</text>
     </svg>
   </div>
 </header>
