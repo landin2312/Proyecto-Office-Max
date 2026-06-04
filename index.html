@@ -51,6 +51,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 .status-dot.online{background:#4caf50}
 .status-dot.offline{background:#f44336}
+.omx-logo{display:flex;align-items:center;padding-left:12px;border-left:1px solid var(--border);margin-left:4px}
+.omx-logo svg{display:block}
 
 /* ── Layout principal ───────────────────────────────────── */
 .main-content{max-width:1400px;margin:0 auto;padding:24px}
@@ -407,6 +409,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 @media(max-width:768px){
   .main-content{padding:12px}
   .app-header{flex-wrap:wrap;height:auto;padding:10px 14px;gap:8px}
+  .omx-logo{padding-left:8px;border-left:none}
+  .omx-logo svg{width:90px;height:25px}
   .kpi-grid{grid-template-columns:1fr}
   .result-strip,.forecast-grid,.v2-filter-grid{grid-template-columns:1fr}
   .chat-panel{width:100%;right:-100%}
@@ -438,6 +442,19 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   <div id="status-badge" class="status-badge offline">
     <span class="status-dot offline" id="status-dot"></span>
     <span id="status-text">🟡 Modo interpretación manual</span>
+  </div>
+
+  <div class="omx-logo" title="OfficeMax México">
+    <svg width="116" height="32" viewBox="0 0 116 32" role="img" aria-label="OfficeMax">
+      <!-- Fondo rojo -->
+      <rect width="116" height="32" rx="4" fill="#CC0000"/>
+      <!-- Línea decorativa inferior -->
+      <rect y="26" width="116" height="6" rx="0" fill="#AA0000"/>
+      <!-- Texto OFFICEMAX -->
+      <text x="58" y="20" text-anchor="middle" fill="#ffffff"
+        font-family="'Arial Black',Arial,sans-serif"
+        font-weight="900" font-size="13" letter-spacing="0.8">OFFICEMAX</text>
+    </svg>
   </div>
 </header>
 
